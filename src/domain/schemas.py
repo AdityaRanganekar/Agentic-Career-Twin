@@ -32,3 +32,11 @@ class StudentTwinProfile(BaseModel):
     experience: List[Experience] = []
     projects: List[Project] = []
     extracted_skills: List[SkillEvidence] = []
+
+class ResourceMapping(BaseModel):
+    gap_skill_name: str = Field(..., description="The exact name of the missing skill.")
+    resource_id: int = Field(..., description="The exact database ID of the recommended course.")
+    justification: str = Field(..., description="A 1-sentence explanation of why this course closes the gap.")
+
+class RoadmapSynthesis(BaseModel):
+    recommendations: List[ResourceMapping]
