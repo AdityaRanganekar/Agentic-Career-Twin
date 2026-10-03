@@ -2,15 +2,19 @@ import logging
 import os
 from datetime import datetime
 
-LOG_FILE = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.log"
+def get_custom_logger(name: str):
+    """Creates or retrieves a logger with your custom timestamped file handler."""
+    logger = logging.getLogger(name)
 
-logs_path = os.path.join(os.getcwd(), "logs")
-os.makedirs(logs_path, exist_ok=True)
-
-LOG_FILE_PATH = os.path.join(logs_path, LOG_FILE)
-
-logging.basicConfig(
-    filename=LOG_FILE_PATH,
-    format="[ %(asctime)s ] %(lineno)d %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+        os.makedirs("logs", exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        fh = logging.FileHandler(f"logs/{timestamp}.log")
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        
+        logger.addHandler(fh)
+        
+    return logger
