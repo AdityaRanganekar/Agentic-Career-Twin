@@ -1,0 +1,10 @@
+scoring:
+  recency_decay_lambda: 0.15
+  base_strength_default: 1.0
+
+market:
+  target_roles:
+    - Data Scientist
+    - Machine Learning Engineer
+    - Data Engineer
+    - Data Analyst
