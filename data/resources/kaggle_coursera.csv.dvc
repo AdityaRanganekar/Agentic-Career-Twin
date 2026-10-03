@@ -1,0 +1,5 @@
+outs:
+- md5: d34546ca53742d4a5218b729dc69e8ae
+  size: 84956
+  hash: md5
+  path: kaggle_coursera.csv

@@ -1,0 +1,5 @@
+outs:
+- md5: dfceada6b945186cd1c799eef16e6372
+  size: 3557545
+  hash: md5
+  path: hybrid_skills_v1.csv
