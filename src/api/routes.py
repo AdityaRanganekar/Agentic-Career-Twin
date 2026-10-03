@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List
 
 from src.db.database import get_db
 from src.db.models import UserProfile, CareerAssessment
 from src.api.schemas import AssessmentCreate, AssessmentResponse
+from src.graph.workflow import compile_career_twin_graph
 from src.utils.logger import get_custom_logger
 
 logger = get_custom_logger(__name__)
@@ -46,3 +47,43 @@ def get_student_assessments(student_id: str, db: Session = Depends(get_db)):
     if not assessments:
         raise HTTPException(status_code=404, detail="No assessments found for this student")
     return assessments
+
+@router.post("/process-resume")
+async def process_resume(
+    file: UploadFile = File(...),
+    target_role: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests a resume, triggers the LangGraph orchestration, and returns 
+    the mathematically validated roadmap and TF-IDF score.
+    """
+    logger.info(f"Processing resume for target role: {target_role}")
+
+    pdf_bytes = await file.read()
+
+    initial_state = {
+        "pdf_bytes": pdf_bytes,
+        "target_role": target_role,
+        "errors": [],
+        "retries": 0
+    }
+    
+    try:
+        graph = compile_career_twin_graph(db)
+
+        final_state = graph.invoke(initial_state)
+        
+        if final_state.get("errors"):
+            logger.warning(f"Graph completed with recoverable errors: {final_state['errors']}")
+
+        return {
+            "readiness_score": final_state.get("readiness_score", 0.0),
+            "missing_skills": final_state.get("missing_skills", []),
+            "recommendations": final_state.get("recommended_resources", []),
+            "errors": final_state.get("errors", [])
+        }
+        
+    except Exception as e:
+        logger.error(f"Graph execution critical failure: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
