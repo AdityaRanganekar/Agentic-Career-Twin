@@ -39,3 +39,5 @@ dvc-s3>=3.1.0
 # Testing & Quality Assurance
 pytest>=8.1.1
 pytest-asyncio>=0.23.5
+
+google-generativeai
