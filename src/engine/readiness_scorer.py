@@ -40,16 +40,22 @@ class ReadinessScorer:
             
         return tf_idf_weights
 
-    def apply_recency_decay(self, base_strength: float, completion_date_str: Optional[str]) -> float:
+    def apply_recency_decay(self, base_strength: float, completion_date_str: Optional[str], decay_floor: float = 0.0) -> float:
         """
         Applies exponential decay based on the age of the evidence.
+        Respects decay_floor (e.g. 0.80 for active senior practitioners).
         """
-        if not completion_date_str:
+        if not completion_date_str or completion_date_str.strip().lower() in {"unknown", "present", "none", "null", "current"}:
             return base_strength  
         
         try:
+            clean_date = completion_date_str.strip()
+            if len(clean_date) == 4 and clean_date.isdigit():
+                clean_date = f"{clean_date}-12-31"
+            elif len(clean_date) == 7 and clean_date[4] == "-":
+                clean_date = f"{clean_date}-28"
 
-            completion_date = datetime.strptime(completion_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            completion_date = datetime.strptime(clean_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
    
             age_in_days = (datetime.now(timezone.utc) - completion_date).days
             age_in_years = age_in_days / 365.25
@@ -57,17 +63,19 @@ class ReadinessScorer:
             if age_in_years <= 0:
                 return base_strength  
                 
-            decayed_strength = base_strength * math.exp(-self.decay_lambda * age_in_years)
-            return round(decayed_strength, 4)
+            decayed = base_strength * math.exp(-self.decay_lambda * age_in_years)
+            if decay_floor > 0.0:
+                decayed = max(decay_floor * base_strength, decayed)
+            return round(decayed, 4)
             
         except ValueError:
-            logger.warning(f"Invalid date format: {completion_date_str}. Skipping decay.")
             return base_strength
 
     def calculate_role_readiness(
         self, 
         student_skills: List[dict], 
-        tf_idf_weights: Dict[str, float]
+        tf_idf_weights: Dict[str, float],
+        decay_floor: float = 0.0
     ) -> float:
         """
         Calculates the final Market-Weighted Skill Coverage score.
@@ -87,7 +95,7 @@ class ReadinessScorer:
                 
             strength = evidence.get("strength", self.base_strength)
             date_str = evidence.get("date")
-            decayed_strength = self.apply_recency_decay(strength, date_str)
+            decayed_strength = self.apply_recency_decay(strength, date_str, decay_floor=decay_floor)
  
             if skill_name not in processed_student_skills or decayed_strength > processed_student_skills[skill_name]:
                 processed_student_skills[skill_name] = decayed_strength
@@ -97,4 +105,4 @@ class ReadinessScorer:
                 earned_score += processed_student_skills[skill_name] * tf_idf_weight
                 
         readiness_percentage = (earned_score / total_possible_score) * 100
-        return min(round(readiness_percentage, 2), 100.0)
+        return max(0.0, min(round(readiness_percentage, 2), 100.0))

@@ -1,26 +1,161 @@
+# ==========================================
+# Agentic Career Twin - .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Environment Variables & Secrets
+# ------------------------------------------
 .env
-.venv/
+.env.*
+*.env
+.streamlit/secrets.toml
+secrets.toml
+*.pem
+*.key
+*.cert
+*.crt
+
+# ------------------------------------------
+# Virtual Environments
+# ------------------------------------------
 venv/
+.venv/
 env/
+env.bak/
+venv.bak/
+ENV/
 BIN/
+
+# ------------------------------------------
+# Python Bytecode & Compilation
+# ------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
 *.so
+
+# ------------------------------------------
+# Package Builds & Distributions
+# ------------------------------------------
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# ------------------------------------------
+# Testing, Coverage & Static Analysis
+# ------------------------------------------
 .pytest_cache/
 .coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
 htmlcov/
-.vscode/
-.idea/
-*.swp
-*.swo
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ------------------------------------------
+# Notebooks & ML Experiment Tracking
+# ------------------------------------------
 .ipynb_checkpoints/
 jupyter_run_log.txt
 mlruns/
-*.parquet
+mlartifacts/
+wandb/
+.neptune/
+
+# ------------------------------------------
+# Machine Learning Weights & Large Model Dumps
+# ------------------------------------------
 *.pt
 *.pth
+*.bin
 *.onnx
+*.safetensors
+*.h5
+*.pkl
+*.pickle
+*.joblib
+*.parquet
+.cache/
+
+# ------------------------------------------
+# Databases & Local Persistent Storage
+# ------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+career_twin.db
+pgdata/
+data/pgdata/
+*.dump
+*.sql.gz
+
+# ------------------------------------------
+# Logs & Diagnostic Traces
+# ------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------------------
+# Data Version Control (DVC) Local Cache
+# ------------------------------------------
+.dvc/cache/
+.dvc/tmp/
+.dvc/config.local
+
+# ------------------------------------------
+# User Uploads, Resumes & Runtime Cache
+# ------------------------------------------
+uploads/
+data/uploads/
+data/resumes/
+data/jobs/live_market_weights.json
+temp/
+tmp/
+*.pdf
+*.docx
+
+# ------------------------------------------
+# IDEs, Editors & Workspaces
+# ------------------------------------------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+
+# ------------------------------------------
+# Operating System Files
+# ------------------------------------------
 .DS_Store
 .DS_Store?
 ._*
@@ -28,10 +163,4 @@ mlruns/
 .Trashes
 ehthumbs.db
 Thumbs.db
-*.log
-*.sqlite
-*.sqlite3
-pgdata/
-.streamlit/secrets.toml
-logs/
-*.log
+Thumbs.db:encryptable

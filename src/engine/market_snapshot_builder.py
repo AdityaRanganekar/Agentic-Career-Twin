@@ -1,4 +1,5 @@
 import os
+import re
 import pandas as pd
 import spacy
 from spacy.matcher import PhraseMatcher
@@ -38,7 +39,7 @@ class MarketSnapshotBuilder:
     def categorize_role(self, title: str) -> str:
         """Deterministically maps raw job titles to the 4 target corpus roles."""
         title_lower = str(title).lower()
-        if "machine learning" in title_lower or "ml" in title_lower:
+        if "machine learning" in title_lower or re.search(r'\bml\b', title_lower):
             return "Machine Learning Engineer"
         elif "scientist" in title_lower or "data science" in title_lower:
             return "Data Scientist"

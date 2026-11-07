@@ -1,10 +1,19 @@
+llm:
+  model_name: "gemini-3.5-flash-lite"
+
 scoring:
   recency_decay_lambda: 0.15
   base_strength_default: 1.0
 
 market:
+  role_cache_ttl_days: 365
   target_roles:
     - Data Scientist
     - Machine Learning Engineer
     - Data Engineer
     - Data Analyst
+
+embedding:
+  model_name: "all-MiniLM-L6-v2"
+  full_credit_threshold: 0.82
+  partial_credit_threshold: 0.68

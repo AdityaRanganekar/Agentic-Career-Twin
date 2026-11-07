@@ -1,19 +1,15 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
-class AssessmentCreate(BaseModel):
-    student_id: str
-    target_role: str
-    readiness_score: float
-    extracted_skills: List[str]
-
-class AssessmentResponse(BaseModel):
+# API Schemas for Agentic Career Twin
+class AnalysisRunResponse(BaseModel):
     id: int
-    student_id: str
+    student_id: int
     target_role: str
     readiness_score: float
-    extracted_skills: List[str]
+    jd_fit_score: Optional[float] = None
+    missing_skills: List[str]
     timestamp: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -18,3 +18,15 @@ class CareerTwinState(TypedDict):
     recommended_resources: List[Dict[str, Any]]
     retries: int
     errors: List[str]
+
+    # Sprint 7: Dual-Scoring Job Description (JD) Fields
+    target_jd_text: Optional[str]
+    jd_extracted_reqs: Optional[Dict[str, float]]
+    jd_fit_score: Optional[float]
+    jd_missing_skills: Optional[List[str]]
+
+    # Radar dimensions
+    radar_dimensions: Optional[Dict[str, float]]
+    jd_radar_dimensions: Optional[Dict[str, float]]
+    market_corpus_version: Optional[str]
+    force_live_refresh: Optional[bool]

@@ -40,3 +40,22 @@ class ResourceMapping(BaseModel):
 
 class RoadmapSynthesis(BaseModel):
     recommendations: List[ResourceMapping] = Field(...)
+
+class JDExtractionResult(BaseModel):
+    """Structured extraction schema for target job descriptions."""
+    core_required_skills: List[str] = Field(
+        default_factory=list,
+        description="Essential hard technical skills, tools, frameworks, and methodologies required by the job description. Do NOT include soft skills or HR fluff."
+    )
+    nice_to_have_skills: List[str] = Field(
+        default_factory=list,
+        description="Preferred, bonus, or secondary technical skills mentioned. Do NOT include soft skills or HR fluff."
+    )
+
+class WeightedSkill(BaseModel):
+    skill_name: str = Field(..., description="Canonical single skill name")
+    importance_weight: float = Field(..., ge=0.1, le=1.0, description="Normalized importance weight between 0.2 and 1.0")
+
+class RoleSkillProfile(BaseModel):
+    target_role: str = Field(..., description="The role name analyzed")
+    core_skills: List[WeightedSkill] = Field(..., description="Top 12-15 core technical skills required for the role")

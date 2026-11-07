@@ -8,8 +8,19 @@ logger = get_custom_logger(__name__)
 def run_profile_agent(state: CareerTwinState, db: Session) -> dict:
     """
     Extracts structured data from the uploaded resume and normalizes skills 
-    against the taxonomy database.
+    against the taxonomy database. Reuses cached student_profile if already present in state.
     """
+    existing_profile = state.get("student_profile")
+    if existing_profile:
+        logger.info("Profile Agent invoked. Using pre-cached student_profile from state.")
+        normalized_skills = [
+            skill.skill_name for skill in existing_profile.extracted_skills
+        ]
+        return {
+            "student_profile": existing_profile,
+            "normalized_student_skills": normalized_skills
+        }
+
     logger.info("Profile Agent invoked. Processing resume PDF.")
     
     try:

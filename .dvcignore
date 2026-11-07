@@ -1,3 +1,155 @@
-# Add patterns of files dvc should ignore, which could improve
-# the performance. Learn more at
+# ==========================================
+# Agentic Career Twin - .dvcignore
+# Patterns of files and directories DVC should ignore.
+# Improves performance and prevents accidental tracking of non-data files.
 # https://dvc.org/doc/user-guide/dvcignore
+# ==========================================
+
+# ------------------------------------------
+# Git & Version Control
+# ------------------------------------------
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ------------------------------------------
+# Environment Variables & Secrets
+# ------------------------------------------
+.env
+.env.*
+*.env
+.streamlit/secrets.toml
+secrets.toml
+*.pem
+*.key
+*.cert
+*.crt
+
+# ------------------------------------------
+# Virtual Environments
+# ------------------------------------------
+venv/
+.venv/
+env/
+env.bak/
+venv.bak/
+ENV/
+BIN/
+
+# ------------------------------------------
+# Python Bytecode & Compilation
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+
+# ------------------------------------------
+# Package Builds & Distributions
+# ------------------------------------------
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# ------------------------------------------
+# Testing & Code Quality Caches
+# ------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ------------------------------------------
+# Notebooks & ML Experiment Logs
+# ------------------------------------------
+.ipynb_checkpoints/
+jupyter_run_log.txt
+mlruns/
+mlartifacts/
+wandb/
+.neptune/
+
+# ------------------------------------------
+# Databases & Local Storage
+# ------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+career_twin.db
+pgdata/
+data/pgdata/
+*.dump
+*.sql.gz
+
+# ------------------------------------------
+# Logs & Diagnostic Traces
+# ------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------------------
+# User Uploads, Resumes & Scratch Files
+# ------------------------------------------
+uploads/
+data/uploads/
+data/resumes/
+data/jobs/live_market_weights.json
+temp/
+tmp/
+*.pdf
+*.docx
+
+# ------------------------------------------
+# IDEs, Editors & Workspaces
+# ------------------------------------------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+
+# ------------------------------------------
+# Operating System Files
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
