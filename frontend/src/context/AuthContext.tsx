@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   login: (identifier: string, pwd: string) => Promise<User>;
   signup: (name: string, username: string, email: string, pwd: string) => Promise<User>;
-  googleAuth: (payload: { code?: string; email?: string; name?: string; google_id?: string }) => Promise<User>;
+  googleAuth: (payload: { code?: string; redirect_uri?: string; id_token?: string; email?: string; name?: string; google_id?: string }) => Promise<User>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const googleAuth = async (payload: { code?: string; email?: string; name?: string; google_id?: string }): Promise<User> => {
+  const googleAuth = async (payload: { code?: string; redirect_uri?: string; id_token?: string; email?: string; name?: string; google_id?: string }): Promise<User> => {
     setIsLoading(true);
     try {
       const u = await authService.googleAuth(payload);

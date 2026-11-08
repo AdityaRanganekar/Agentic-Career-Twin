@@ -29,8 +29,11 @@ def test_scraper_missing_credentials_graceful():
     scraper.adzuna_app_key = None
     scraper.serpapi_key = None
 
-    jobs = scraper.scrape_role("Data Scientist", max_jobs=10)
-    assert jobs == [], "Scraper must return empty list without crashing when API credentials are unset"
+    with patch.object(scraper, 'fetch_remotive_jobs', return_value=[]), \
+         patch.object(scraper, 'fetch_arbeitnow_jobs', return_value=[]), \
+         patch.object(scraper, 'fetch_web_job_snippets', return_value=[]):
+        jobs = scraper.scrape_role("Data Scientist", max_jobs=10)
+        assert jobs == [], "Scraper must return empty list without crashing when API credentials are unset"
 
 def test_scraper_skill_extraction():
     text = "We are seeking a candidate experienced in Python, PyTorch, Docker, and Kubernetes for building ML pipelines."

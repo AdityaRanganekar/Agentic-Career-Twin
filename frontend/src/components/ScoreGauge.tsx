@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Award } from 'lucide-react';
 
 interface ScoreGaugeProps {
   score: number;
@@ -7,6 +8,8 @@ interface ScoreGaugeProps {
   strokeWidth?: number;
   color?: string;
   label?: string;
+  showScoreText?: boolean;
+  icon?: React.ReactNode;
 }
 
 export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
@@ -15,6 +18,8 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   strokeWidth = 9,
   color = '#D9541E',
   label,
+  showScoreText = false,
+  icon,
 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -49,13 +54,19 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="font-display text-2xl font-bold tracking-tight">
-          {score.toFixed(1)}%
-        </span>
-        {label && (
-          <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
-            {label}
-          </span>
+        {showScoreText ? (
+          <>
+            <span className="font-display text-2xl font-bold tracking-tight">
+              {score.toFixed(1)}%
+            </span>
+            {label && (
+              <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
+                {label}
+              </span>
+            )}
+          </>
+        ) : (
+          icon || <Award className="w-8 h-8 text-[#D9541E]" />
         )}
       </div>
     </div>

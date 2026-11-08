@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, BookOpen, CheckCircle, GraduationCap } from 'lucide-react';
+import { ExternalLink, BookOpen, CheckCircle, GraduationCap, Filter } from 'lucide-react';
 import { Recommendation } from '../types';
 
 interface RoadmapViewProps {
@@ -12,6 +12,8 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
   recommendations,
   targetRole,
 }) => {
+  const [filter, setFilter] = useState<'all' | 'role' | 'jd'>('all');
+
   if (!recommendations || recommendations.length === 0) {
     return (
       <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-12 text-center shadow-crisp">
@@ -28,6 +30,20 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
     );
   }
 
+  const roleCount = recommendations.filter(
+    (r) => r.gap_type === 'Role Gap' || r.gap_type === 'Role & JD Gap' || !r.gap_type
+  ).length;
+  const jdCount = recommendations.filter(
+    (r) => r.gap_type === 'Target JD Gap' || r.gap_type === 'Role & JD Gap'
+  ).length;
+  const total = recommendations.length;
+
+  const filteredRecommendations = recommendations.filter((r) => {
+    if (filter === 'role') return r.gap_type === 'Role Gap' || r.gap_type === 'Role & JD Gap' || !r.gap_type;
+    if (filter === 'jd') return r.gap_type === 'Target JD Gap' || r.gap_type === 'Role & JD Gap';
+    return true;
+  });
+
   const getPlatformClass = (platform: string) => {
     const p = platform.toLowerCase();
     if (p.includes('udemy')) return 'bg-[#6D28D9] text-white hover:bg-[#5B21B6]';
@@ -37,33 +53,93 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
     return 'bg-[#334155] text-white hover:bg-[#1E293B]';
   };
 
+  const renderGapBadge = (gapType?: string) => {
+    const type = gapType || 'Role Gap';
+    if (type === 'Target JD Gap') {
+      return (
+        <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+          Target JD Gap
+        </span>
+      );
+    }
+    if (type === 'Role & JD Gap') {
+      return (
+        <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+          Role & JD Gap
+        </span>
+      );
+    }
+    return (
+      <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-[#D9541E]/15 text-[#D9541E] border border-[#D9541E]/30">
+        Role Gap
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* Roadmap Header */}
-      <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-[#D9541E]/10 text-[#D9541E]">
-            <GraduationCap className="w-5 h-5" />
+      {/* Roadmap Header & Category Filters */}
+      <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-[#D9541E]/10 text-[#D9541E]">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3]">
+                Multi-Platform Learning Roadmap
+              </h2>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
+                Targeted study paths and direct search links dynamically constructed for <strong className="text-[#D9541E]">{targetRole}</strong>.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-display text-xl font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3]">
-              Multi-Platform Learning Roadmap
-            </h2>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
-              Targeted study paths and direct search links dynamically constructed for <strong className="text-[#D9541E]">{targetRole}</strong>.
-            </p>
-          </div>
+
+          {jdCount > 0 && (
+            <div className="flex items-center gap-1.5 p-1 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 self-start sm:self-auto">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  filter === 'all'
+                    ? 'bg-canvas-card dark:bg-black/60 text-[#111111] dark:text-[#F3EEE3] shadow-crisp border border-black/10 dark:border-white/10'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-[#111111] dark:hover:text-[#F3EEE3]'
+                }`}
+              >
+                All ({total})
+              </button>
+              <button
+                onClick={() => setFilter('role')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  filter === 'role'
+                    ? 'bg-canvas-card dark:bg-black/60 text-[#111111] dark:text-[#F3EEE3] shadow-crisp border border-black/10 dark:border-white/10'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-[#111111] dark:hover:text-[#F3EEE3]'
+                }`}
+              >
+                Role ({roleCount})
+              </button>
+              <button
+                onClick={() => setFilter('jd')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  filter === 'jd'
+                    ? 'bg-canvas-card dark:bg-black/60 text-[#111111] dark:text-[#F3EEE3] shadow-crisp border border-black/10 dark:border-white/10'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-[#111111] dark:hover:text-[#F3EEE3]'
+                }`}
+              >
+                Target JD ({jdCount})
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Cards List */}
       <div className="space-y-4">
-        {recommendations.map((rec, index) => (
+        {filteredRecommendations.map((rec, index) => (
           <motion.div
             key={rec.skill}
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: index * 0.08 }}
+            transition={{ duration: 0.35, delay: index * 0.05 }}
             className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp hover:shadow-elevated transition-shadow"
           >
             {/* Header: Skill Name & Priority */}
@@ -72,9 +148,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
                 <span className="font-display text-lg font-bold text-[#111111] dark:text-[#F3EEE3]">
                   {rec.skill}
                 </span>
-                <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/80 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800">
-                  Core Gap
-                </span>
+                {renderGapBadge(rec.gap_type)}
               </div>
               <span className="text-xs font-mono text-neutral-500">
                 Roadmap Item #{index + 1}

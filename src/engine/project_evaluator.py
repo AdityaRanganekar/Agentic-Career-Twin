@@ -20,12 +20,12 @@ TECHNICAL_ACTION_VERBS: Set[str] = {
     "scaled", "analyzed", "modeled", "configured", "maintained", "migrated"
 }
 
-# Universal proof & publication markers
+# Universal proof & publication markers (Strictly verifiable URLs, repositories, and certifications)
 UNIVERSAL_PROOF_PATTERNS = [
     r'https?://\S+',
-    r'\b(?:github|gitlab|bitbucket)(?:\.com)?\b',
-    r'\b(?:huggingface|arxiv|kaggle|pypi|npmjs|dockerhub)\b',
-    r'\b(?:repository|repo|live demo|deployed|live url|production|open source|publication|paper|patent|certified|certification)\b'
+    r'\b(?:github|gitlab|bitbucket|linkedin)\.com/\S+',
+    r'\b(?:github|gitlab|dagshub|live url|video walkthrough|live demo|arxiv|pypi|dockerhub)\b',
+    r'\b(?:certified|certification|hackerrank|oracle cloud|aws certified|coursera|udemy)\b'
 ]
 
 def get_combined_project_and_exp_text(profile: StudentTwinProfile) -> str:
@@ -167,8 +167,9 @@ def evaluate_projects_and_proof(
     # 3. Universal measurements & engineering benchmarks
     benchmark_patterns = [
         r'\b(?:reduced|increased|improved|achieved|optimized|scaled|accelerated|lowered|decreased|cut|boosted|saved)\s+(?:by\s+)?[\d.]+%?',
-        r'\b\d+(?:\.\d+)?\s*(?:ms|seconds|minutes|hours|k|m|b|gb|tb|fps|qps|tps|db|f1|auc|accuracy|recall|precision|users|requests|queries|rps|events|samples|records|parameters|params)\b',
-        r'\b(?:batch[ -]?size|learning[ -]?rate|epochs?|c\s*=)\s*(?:=|:)?\s*[\de.-]+'
+        r'\b\d+(?:\.\d+)?\s*(?:ms|seconds|minutes|hours|k|m|b|gb|tb|fps|qps|tps|db|f1|auc|accuracy|recall|precision|cgpa|gpa|psnr|ssim|users|requests|queries|rps|events|samples|records|parameters|params)\b',
+        r'\b(?:batch[ -]?size|learning[ -]?rate|epochs?|c\s*=|lr\s*=|f1|recall|precision|accuracy)\s*(?:=|:|\s)?\s*[\de.-]+',
+        r'\b\d+[- ](?:statement|tier|party|way|step|phase|stage)\b'
     ]
     for pat in benchmark_patterns:
         matches = re.findall(pat, combined_text, re.IGNORECASE)
@@ -178,14 +179,16 @@ def evaluate_projects_and_proof(
     unique_metrics = list(dict.fromkeys(detected_metrics))
     num_metrics = len(unique_metrics)
 
-    if num_metrics >= 3:
-        metrics_score = 95.0
+    if num_metrics >= 5:
+        metrics_score = 98.0
+    elif num_metrics >= 3:
+        metrics_score = 88.0
     elif num_metrics == 2:
-        metrics_score = 80.0
+        metrics_score = 72.0
     elif num_metrics == 1:
-        metrics_score = 65.0
+        metrics_score = 52.0
     else:
-        metrics_score = 40.0
+        metrics_score = 25.0
 
     # ----------------------------------------------------
     # B. Engineering Depth & Verifiable Proof Score (Universal)
@@ -197,25 +200,30 @@ def evaluate_projects_and_proof(
             detected_proof_signals.append(m.strip().title())
 
     unique_proof_signals = list(dict.fromkeys(detected_proof_signals))
+    num_proof_signals = len(unique_proof_signals)
 
     # Narrative depth & action-architecture structure
     words = lower_text.split()
-    action_verb_count = sum(1 for w in words if w in TECHNICAL_ACTION_VERBS)
     desc_word_count = len(words)
+    num_projects = len(profile.projects or [])
 
-    if desc_word_count > 60 and action_verb_count >= 3:
-        narrative_depth = 92.0
-    elif desc_word_count > 30 and action_verb_count >= 1:
-        narrative_depth = 78.0
+    if num_projects >= 3 and desc_word_count >= 120:
+        narrative_depth = 96.0
+    elif num_projects >= 2 and desc_word_count >= 80:
+        narrative_depth = 85.0
+    elif num_projects == 0 and desc_word_count < 80:
+        narrative_depth = 42.0
     else:
-        narrative_depth = 50.0
+        narrative_depth = 62.0
 
-    if len(unique_proof_signals) >= 2:
-        proof_signals_score = 95.0
-    elif len(unique_proof_signals) == 1:
-        proof_signals_score = 75.0
+    if num_proof_signals >= 3:
+        proof_signals_score = 98.0
+    elif num_proof_signals == 2:
+        proof_signals_score = 82.0
+    elif num_proof_signals == 1:
+        proof_signals_score = 60.0
     else:
-        proof_signals_score = 45.0
+        proof_signals_score = 20.0
 
     # Skill evidence ratio: fraction of claimed skills demonstrated in narrative
     claimed_skills = profile.extracted_skills or []
@@ -229,16 +237,9 @@ def evaluate_projects_and_proof(
         evidence_ratio = 0.5
 
     proof_score = min(98.0, round(
-        0.35 * narrative_depth + 0.35 * proof_signals_score + 0.30 * (evidence_ratio * 100),
+        0.40 * narrative_depth + 0.40 * proof_signals_score + 0.20 * (evidence_ratio * 100),
         1
     ))
-
-    # Senior practitioner baseline adjustment
-    exp_roles = " ".join([e.role.lower() for e in (profile.experience or [])])
-    is_senior = any(kw in exp_roles for kw in ["senior", "lead", "principal", "staff", "head", "director"])
-    if is_senior or num_experience >= 2:
-        metrics_score = max(metrics_score, 88.0)
-        proof_score = max(proof_score, 92.0)
 
     # ----------------------------------------------------
     # C. Target Role Alignment Score (Domain-Agnostic)

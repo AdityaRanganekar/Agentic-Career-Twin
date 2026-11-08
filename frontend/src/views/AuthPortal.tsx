@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Cpu, ShieldCheck, Layers, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -18,10 +18,37 @@ export const AuthPortal: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
 
-  // Google quick modal
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
+  // Handle Google OAuth 2.0 redirect callback (?code=... or ?error=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const oauthError = params.get('error');
+
+    if (oauthError) {
+      setError(`Google authorization returned: ${oauthError}. Authorized Redirect URI in Google Cloud Console must match: ${window.location.origin}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (code) {
+      const exchangeCode = async () => {
+        try {
+          await googleAuth({
+            code,
+            redirect_uri: window.location.origin,
+          });
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (err: any) {
+          setError(
+            err?.response?.data?.detail ||
+            `Google OAuth verification failed. Please verify that ${window.location.origin} is added to Authorized redirect URIs in Google Cloud Console.`
+          );
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      };
+      exchangeCode();
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,25 +81,17 @@ export const AuthPortal: React.FC = () => {
   const handleGoogleClick = async () => {
     setError(null);
     try {
-      const cfg = await authService.getGoogleUrl();
+      const redirectUri = window.location.origin;
+      const cfg = await authService.getGoogleUrl(redirectUri);
       if (cfg.configured && cfg.auth_url) {
         window.location.href = cfg.auth_url;
       } else {
-        setShowGoogleModal(true);
+        setError(
+          `Google OAuth is not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your .env file with authorized redirect URI: ${redirectUri}`
+        );
       }
-    } catch {
-      setShowGoogleModal(true);
-    }
-  };
-
-  const handleGoogleDirectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleEmail) return;
-    try {
-      await googleAuth({ email: googleEmail, name: googleName });
-      setShowGoogleModal(false);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Google sign-in failed.');
+      setError(err?.response?.data?.detail || 'Failed to initiate Google OAuth login.');
     }
   };
 
@@ -340,53 +359,6 @@ export const AuthPortal: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* Google Direct Modal for local testing */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl border border-black/15 p-6 max-w-sm w-full shadow-elevated">
-            <h3 className="font-display font-bold text-base text-[#111111]">
-              Google Account Sign-In
-            </h3>
-            <p className="text-xs text-neutral-600 mt-1 mb-4">
-              Enter your Google email address to connect your profile:
-            </p>
-            <form onSubmit={handleGoogleDirectSubmit} className="space-y-3">
-              <input
-                type="email"
-                placeholder="Google email (e.g. user@gmail.com)"
-                value={googleEmail}
-                onChange={(e) => setGoogleEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2 border rounded-md text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Name (Optional)"
-                value={googleName}
-                onChange={(e) => setGoogleName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm"
-              />
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleModal(false)}
-                  className="px-3 py-1.5 text-xs text-neutral-600 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-4 py-1.5 bg-[#D9541E] text-white rounded-md text-xs font-bold"
-                >
-                  Sign In
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

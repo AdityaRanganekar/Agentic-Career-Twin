@@ -69,6 +69,32 @@ DOMAIN_ROLE_FALLBACKS: Dict[str, Dict[str, float]] = {
     }
 }
 
+ROLE_SYNONYMS: Dict[str, str] = {
+    "ml engineer": "Machine Learning Engineer",
+    "mle": "Machine Learning Engineer",
+    "machine learning engineer": "Machine Learning Engineer",
+    "machine learning": "Machine Learning Engineer",
+    "ai engineer": "AI / LLM Engineer",
+    "llm engineer": "AI / LLM Engineer",
+    "ai / llm engineer": "AI / LLM Engineer",
+    "agentic ai engineer": "AI / LLM Engineer",
+    "ds": "Data Scientist",
+    "data science": "Data Scientist",
+    "data scientist": "Data Scientist",
+    "swe": "Backend Software Engineer",
+    "sde": "Backend Software Engineer",
+    "software engineer": "Backend Software Engineer",
+    "software development engineer": "Backend Software Engineer",
+    "backend engineer": "Backend Software Engineer",
+    "backend software engineer": "Backend Software Engineer",
+    "sre": "Site Reliability Engineer",
+    "site reliability engineer": "Site Reliability Engineer",
+}
+
+def normalize_role_name(role: str) -> str:
+    cleaned = (role or "").strip().lower()
+    return ROLE_SYNONYMS.get(cleaned, (role or "").strip())
+
 class RoleResearchAgent:
     """
     Manages self-caching market role discovery with semantic cache lookup and TTL expiration.
@@ -84,6 +110,8 @@ class RoleResearchAgent:
         Step A: Checks PostgreSQL for an exact or semantic match within the active TTL window.
         Returns (weights, market_corpus_version) on cache hit, or None on cache miss/expired TTL.
         """
+        target_role = normalize_role_name(target_role)
+
         if force_refresh:
             logger.info(f"Force refresh requested for '{target_role}'; bypassing DB cache.")
             return None
@@ -175,6 +203,7 @@ class RoleResearchAgent:
         Step B: Scrapes live job listings and web snippets, extracts top core technical skills
         via Gemini, and persists the new profile to PostgreSQL with current timestamp.
         """
+        target_role = normalize_role_name(target_role)
         logger.info(f"Executing Live Web Discovery for target role: '{target_role}'...")
         scraper = JobMarketScraper()
         jobs = scraper.scrape_role(target_role, max_jobs=max_jobs)

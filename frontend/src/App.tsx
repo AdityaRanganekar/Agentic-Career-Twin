@@ -12,7 +12,7 @@ import { ActiveTab, AnalysisResult } from './types';
 const MainLayout: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-  const [targetRole, setTargetRole] = useState('Data Scientist');
+  const [targetRole, setTargetRole] = useState('');
   const [latestResult, setLatestResult] = useState<AnalysisResult | null>(null);
 
   if (!user) {
@@ -35,7 +35,9 @@ const MainLayout: React.FC = () => {
   const getTabSubtitle = () => {
     switch (activeTab) {
       case 'overview':
-        return `Evaluating verified competency footprint for ${targetRole}`;
+        return targetRole
+          ? `Evaluating verified competency footprint for ${targetRole}`
+          : 'Benchmark candidate resume against technical disciplines or specific job postings';
       case 'roadmap':
         return 'Targeted study curricula with direct course search parameters';
       case 'history':
@@ -87,6 +89,12 @@ const MainLayout: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  React.useEffect(() => {
+    if (window.location.search.includes('error=') || window.location.hash.includes('error=')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>

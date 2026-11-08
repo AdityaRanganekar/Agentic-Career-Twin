@@ -18,12 +18,23 @@ export const authService = {
     return response.data;
   },
 
-  async getGoogleUrl(): Promise<{ configured: boolean; auth_url: string | null }> {
-    const response = await apiClient.get<{ configured: boolean; auth_url: string | null }>('/auth/google-url');
+  async getGoogleUrl(redirectUri?: string): Promise<{ configured: boolean; auth_url: string | null; redirect_uri?: string }> {
+    const params = redirectUri ? { redirect_uri: redirectUri } : {};
+    const response = await apiClient.get<{ configured: boolean; auth_url: string | null; redirect_uri?: string }>(
+      '/auth/google-url',
+      { params }
+    );
     return response.data;
   },
 
-  async googleAuth(payload: { code?: string; email?: string; name?: string; google_id?: string }): Promise<User> {
+  async googleAuth(payload: {
+    code?: string;
+    redirect_uri?: string;
+    id_token?: string;
+    email?: string;
+    name?: string;
+    google_id?: string;
+  }): Promise<User> {
     const response = await apiClient.post<User>('/auth/google', payload);
     return response.data;
   },

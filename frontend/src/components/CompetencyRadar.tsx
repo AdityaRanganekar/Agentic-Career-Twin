@@ -12,14 +12,18 @@ import { useTheme } from '../context/ThemeContext';
 
 interface CompetencyRadarProps {
   radarDimensions: Record<string, number> | null;
-  jdRadarDimensions?: Record<string, number> | null;
-  targetRole: string;
+  benchmarkDimensions?: Record<string, number> | null;
+  benchmarkName?: string;
+  candidateName?: string;
+  targetRole?: string;
 }
 
 export const CompetencyRadar: React.FC<CompetencyRadarProps> = ({
   radarDimensions,
-  jdRadarDimensions,
-  targetRole,
+  benchmarkDimensions,
+  benchmarkName,
+  candidateName = 'Candidate Competency',
+  targetRole = 'Target Role',
 }) => {
   const { theme } = useTheme();
 
@@ -36,17 +40,15 @@ export const CompetencyRadar: React.FC<CompetencyRadarProps> = ({
   const categories = Object.keys(radarDimensions);
   const chartData = categories.map((cat) => ({
     category: cat,
-    Candidate: Math.round(radarDimensions[cat] || 0),
-    MarketStandard: 85,
-    ...(jdRadarDimensions && jdRadarDimensions[cat] !== undefined
-      ? { TargetJD: Math.round(jdRadarDimensions[cat] || 60) }
-      : {}),
+    Candidate: Math.round(radarDimensions[cat] ?? 0),
+    Benchmark: Math.round(benchmarkDimensions?.[cat] ?? 85),
   }));
 
   const isDark = theme === 'dark';
   const gridColor = isDark ? 'rgba(243, 238, 227, 0.18)' : 'rgba(17, 17, 17, 0.14)';
   const tickColor = isDark ? '#F3EEE3' : '#111111';
   const marketStroke = isDark ? '#94A3B8' : '#111111';
+  const resolvedBenchmarkName = benchmarkName || `Market Standard (${targetRole})`;
 
   return (
     <div className="w-full flex flex-col">
@@ -73,32 +75,24 @@ export const CompetencyRadar: React.FC<CompetencyRadarProps> = ({
               tick={{ fill: tickColor, fontSize: 9 }}
               tickFormatter={(val) => `${val}%`}
             />
+
             <Radar
-              name={`Market Standard (${targetRole})`}
-              dataKey="MarketStandard"
+              name={resolvedBenchmarkName}
+              dataKey="Benchmark"
               stroke={marketStroke}
               strokeDasharray="4 4"
               strokeWidth={1.5}
               fill="transparent"
             />
             <Radar
-              name="Candidate Competency"
+              name={candidateName}
               dataKey="Candidate"
               stroke="#D9541E"
               strokeWidth={2.2}
               fill="#D9541E"
               fillOpacity={0.28}
             />
-            {jdRadarDimensions && (
-              <Radar
-                name="Target Job Footprint"
-                dataKey="TargetJD"
-                stroke="#16A34A"
-                strokeWidth={2}
-                fill="#16A34A"
-                fillOpacity={0.16}
-              />
-            )}
+
             <Legend
               wrapperStyle={{
                 paddingTop: '14px',
@@ -109,10 +103,6 @@ export const CompetencyRadar: React.FC<CompetencyRadarProps> = ({
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-3 text-xs text-neutral-600 dark:text-neutral-400 text-center leading-relaxed font-sans">
-        A broader, symmetrical polygon signifies balanced competency coverage across core architectural disciplines, whereas inward vertices indicate skill gap areas.
-      </p>
     </div>
   );
 };
-

@@ -61,7 +61,7 @@ def build_platform_links(skill_name: str) -> List[Dict[str, str]]:
         {"platform": "Documentation", "url": f"https://www.google.com/search?q={q}+official+documentation+guide"}
     ]
 
-def generate_deterministic_guidance(skill_name: str, target_role: str = "Target Role") -> Dict[str, Any]:
+def generate_deterministic_guidance(skill_name: str, target_role: str = "Target Role", gap_type: str = "Role Gap") -> Dict[str, Any]:
     """Generates deterministic 1-2 sentence justification and 3 concrete sub-topics."""
     cleaned = clean_skill_for_search(skill_name)
     sub_tokens = [t.strip().title() for t in re.split(r'[\s/,]+', cleaned) if len(t.strip()) > 2]
@@ -69,7 +69,7 @@ def generate_deterministic_guidance(skill_name: str, target_role: str = "Target 
     if len(sub_tokens) >= 3:
         key_topics = [
             f"Core architecture and foundational patterns of {sub_tokens[0]}",
-            f"Practical implementation and data pipelines with {sub_tokens[1]}",
+            f"Practical implementation and data workflows with {sub_tokens[1]}",
             f"Production deployment, testing, and optimization of {sub_tokens[2]}"
         ]
     elif len(sub_tokens) == 2:
@@ -80,15 +80,26 @@ def generate_deterministic_guidance(skill_name: str, target_role: str = "Target 
         ]
     else:
         key_topics = [
-            f"Core principles, syntax, and internal architecture of {skill_name}",
-            f"Building real-world, end-to-end projects demonstrating {skill_name}",
-            f"Production deployment, automated testing, and performance benchmarking"
+            f"Core principles, syntax, and operational architecture of {skill_name}",
+            f"Building real-world, verified projects demonstrating {skill_name}",
+            f"Deployment, automated validation, and performance benchmarking"
         ]
         
-    justification = (
-        f"Mastering {skill_name} is essential for {target_role} roles to design robust solutions, "
-        f"satisfy core industry requirements, and demonstrate verified technical depth."
-    )
+    if gap_type == "Target JD Gap":
+        justification = (
+            f"Explicit requirement from your Target Job Description. Mastering {skill_name} validates your qualifications "
+            f"for role-specific workflows and operational benchmarks."
+        )
+    elif gap_type == "Role & JD Gap":
+        justification = (
+            f"High-priority intersection: Mastering {skill_name} directly addresses both broader {target_role} market demands "
+            f"and the specific requirements of your uploaded Target Job Description."
+        )
+    else:
+        justification = (
+            f"Mastering {skill_name} is essential for {target_role} roles to design robust solutions, "
+            f"satisfy core industry standards, and demonstrate verified technical depth."
+        )
     return {"justification": justification, "key_topics": key_topics[:3]}
 
 def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = None) -> dict:
@@ -105,10 +116,23 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
     jd_gaps = state.get("jd_missing_skills") or []
     target_role = state.get("target_role", "Target Role")
     
-    # Deduplicate priority gaps while preserving order (up to 6)
-    missing_skills = list(dict.fromkeys(market_gaps + jd_gaps))[:6]
+    # Deduplicate priority gaps while preserving order (up to 16 to avoid artificial truncation)
+    missing_skills = list(dict.fromkeys(market_gaps + jd_gaps))[:16]
     if not missing_skills:
         return {"recommended_resources": []}
+
+    market_gap_set = set(market_gaps)
+    jd_gap_set = set(jd_gaps)
+    gap_type_map = {}
+    for s in missing_skills:
+        in_market = s in market_gap_set
+        in_jd = s in jd_gap_set
+        if in_market and in_jd:
+            gap_type_map[s] = "Role & JD Gap"
+        elif in_jd:
+            gap_type_map[s] = "Target JD Gap"
+        else:
+            gap_type_map[s] = "Role Gap"
 
     # Detect unit test mock database
     is_mock_db = (
@@ -166,9 +190,11 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
                             if db_rec:
                                 clean_q = clean_skill_for_search(rec.gap_skill_name)
                                 q = urllib.parse.quote_plus(clean_q)
-                                guidance = generate_deterministic_guidance(rec.gap_skill_name, target_role)
+                                g_type = gap_type_map.get(rec.gap_skill_name, "Role Gap")
+                                guidance = generate_deterministic_guidance(rec.gap_skill_name, target_role, g_type)
                                 final_recs.append({
                                     "skill": rec.gap_skill_name,
+                                    "gap_type": g_type,
                                     "course_title": db_rec.title,
                                     "url": db_rec.url or f"https://www.udemy.com/courses/search/?src=ukw&q={q}",
                                     "platform_links": build_platform_links(rec.gap_skill_name),
@@ -186,9 +212,17 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
         try:
             model = get_gemini_client()
             prompt = (
-                f"You are a technical mentor designing a study roadmap for the role: {target_role}.\n"
-                f"For each missing competency, provide a 1-2 sentence practical justification and 3 concrete sub-topics to learn.\n"
-                f"Missing competencies: {', '.join(missing_skills)}"
+                f"You are an expert career mentor and technical curriculum architect.\n"
+                f"Candidate Target Role: {target_role}\n\n"
+                f"We have identified key competency gaps that the candidate needs to study. "
+                f"Each competency has an attributed gap type:\n"
+                f"- 'Role Gap': Core requirement for {target_role} positions in the broader market.\n"
+                f"- 'Target JD Gap': Explicit requirement from an uploaded specific target job description (which may be a cross-functional, departmental, or operational requirement).\n"
+                f"- 'Role & JD Gap': High-priority intersection required by both the market and the specific target job description.\n\n"
+                f"CRITICAL DOMAIN AUTHENTICITY RULE:\n"
+                f"For 'Target JD Gap' competencies, explain the skill in its AUTHENTIC, domain-accurate context (e.g., if the skill is 'Operations & Process Planning' or 'Quality Assurance & Control', explain it in its real industrial/operational workflow context). DO NOT fabricate absurd or contrived connections to '{target_role}' (e.g., NEVER claim 'Thermodynamics is used in web backend microservices' or similar nonsense).\n\n"
+                f"For each missing competency, provide a clear, professional 1-2 sentence justification explaining why this skill is needed in its proper domain, and list 3 concrete, real-world sub-topics to learn.\n\n"
+                f"Competencies to cover:\n" + "\n".join([f"- {s} [{gap_type_map.get(s, 'Role Gap')}]" for s in missing_skills])
             )
             resp = model.generate_content(
                 prompt,
@@ -196,7 +230,8 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
                     response_mime_type="application/json",
                     response_schema=MultiSkillStudyGuide,
                     temperature=0.2
-                )
+                ),
+                request_options={"timeout": 5}
             )
             parsed = json.loads(resp.text)
             guide_list = parsed.get("guides", [])
@@ -216,15 +251,17 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
             q = urllib.parse.quote_plus(clean_q)
             platform_links = build_platform_links(skill)
             primary_url = f"https://www.udemy.com/courses/search/?src=ukw&q={q}"
+            g_type = gap_type_map.get(skill, "Role Gap")
 
             # Retrieve LLM guidance or fallback
             s_low = skill.strip().lower()
             guide = llm_guidance.get(s_low)
             if not guide or not guide.get("justification") or not guide.get("key_topics"):
-                guide = generate_deterministic_guidance(skill, target_role)
+                guide = generate_deterministic_guidance(skill, target_role, g_type)
 
             recommendations.append({
                 "skill": skill,
+                "gap_type": g_type,
                 "course_title": f"{skill} — Multi-Platform Learning Path",
                 "url": primary_url,
                 "platform_links": platform_links,
@@ -242,12 +279,14 @@ def run_recommendation_agent(state: CareerTwinState, db: Optional[Session] = Non
         for skill in missing_skills:
             clean_q = clean_skill_for_search(skill)
             q = urllib.parse.quote_plus(clean_q)
+            g_type = gap_type_map.get(skill, "Role Gap")
             fallback_recs.append({
                 "skill": skill,
+                "gap_type": g_type,
                 "course_title": f"{skill} — Multi-Platform Learning Path",
                 "url": f"https://www.udemy.com/courses/search/?src=ukw&q={q}",
                 "platform_links": build_platform_links(skill),
-                "justification": f"Essential core competency for {target_role} roles.",
+                "justification": generate_deterministic_guidance(skill, target_role, g_type)["justification"],
                 "key_topics": [f"{skill} fundamentals", f"Practical implementation", "Testing & optimization"]
             })
         return {"recommended_resources": fallback_recs}

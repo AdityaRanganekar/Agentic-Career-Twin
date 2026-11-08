@@ -46,11 +46,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Active Role Target
           </div>
           <div className="font-display font-semibold text-sm text-[#F3EEE3] mt-1 truncate">
-            {targetRole}
+            {targetRole || 'None Selected'}
           </div>
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-400">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Market Vector Synchronized</span>
+            <span>{targetRole ? 'Market Vector Synchronized' : 'Awaiting Selection'}</span>
           </div>
         </div>
 

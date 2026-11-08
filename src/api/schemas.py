@@ -15,6 +15,8 @@ class LoginRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     code: Optional[str] = None
+    id_token: Optional[str] = None
+    redirect_uri: Optional[str] = None
     email: Optional[str] = None
     name: Optional[str] = None
     google_id: Optional[str] = None

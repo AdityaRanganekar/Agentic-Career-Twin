@@ -3,13 +3,21 @@ import { ResumeQualityBreakdown } from '../types';
 import { BarChart3, Cpu, Link2 } from 'lucide-react';
 
 interface EvidenceBreakdownProps {
-  breakdown: ResumeQualityBreakdown | null;
+  breakdown: ResumeQualityBreakdown | null | undefined;
   projectQualityScore?: number | null;
+  title?: string;
+  subtitle?: string;
+  stackLabel?: string;
+  stackDescription?: string;
 }
 
 export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
   breakdown,
   projectQualityScore = 0,
+  title = "Resume Evidence & Impact Audit",
+  subtitle = "Human-grade evaluation separating verifiable engineering outcomes from superficial keyword listings.",
+  stackLabel = "Project-Verified Stack",
+  stackDescription = "Tools and frameworks validated inside narrative project and work experience implementations rather than standalone keyword lists.",
 }) => {
   if (!breakdown) {
     return null;
@@ -24,10 +32,10 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-black/10 dark:border-white/10 gap-3">
         <div>
           <h3 className="font-display text-lg font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3]">
-            Resume Evidence & Impact Audit
+            {title}
           </h3>
           <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-            Human-grade evaluation separating verifiable engineering outcomes from superficial keyword listings.
+            {subtitle}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -81,7 +89,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-[#D9541E]" />
               <h4 className="font-display text-sm font-bold text-[#111111] dark:text-[#F3EEE3]">
-                Project-Verified Stack
+                {stackLabel}
               </h4>
             </div>
             <span className="font-mono text-xs font-bold text-[#111111] dark:text-[#F3EEE3]">
@@ -89,7 +97,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
             </span>
           </div>
           <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Tools and frameworks validated inside narrative project and work experience implementations rather than standalone keyword lists.
+            {stackDescription}
           </p>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {stack.length > 0 ? (

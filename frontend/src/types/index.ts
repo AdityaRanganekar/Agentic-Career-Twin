@@ -13,6 +13,7 @@ export interface PlatformLink {
 
 export interface Recommendation {
   skill: string;
+  gap_type?: 'Role Gap' | 'Target JD Gap' | 'Role & JD Gap' | string;
   course_title: string;
   url: string;
   platform_links: PlatformLink[];
@@ -34,19 +35,22 @@ export interface AnalysisResult {
   student_id: number;
   student_name: string;
   student_email: string;
-  readiness_score: number;
+  readiness_score: number | null;
   score_delta: number | null;
   previous_timestamp: string | null;
-  missing_skills: string[];
+  missing_skills: string[] | null;
   jd_fit_score: number | null;
   jd_missing_skills: string[] | null;
   radar_dimensions: Record<string, number> | null;
   jd_radar_dimensions: Record<string, number> | null;
+  jd_benchmark_dimensions?: Record<string, number> | null;
   market_corpus_version: string;
   recommendations: Recommendation[];
   student_profile_json: string | null;
   resume_quality_breakdown: ResumeQualityBreakdown | null;
   project_quality_score: number | null;
+  jd_quality_breakdown?: ResumeQualityBreakdown | null;
+  jd_project_quality_score?: number | null;
   errors: string[];
 }
 

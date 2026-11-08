@@ -105,6 +105,9 @@ htmlcov/
 .pyre/
 .pytype/
 .ruff_cache/
+playwright-report/
+.playwright/
+test-results/
 
 # ------------------------------------------
 # Notebooks & ML Experiment Tracking
@@ -117,7 +120,7 @@ wandb/
 .neptune/
 
 # ------------------------------------------
-# Machine Learning Weights & Large Model Dumps
+# Machine Learning Weights, Embeddings & Vector Stores
 # ------------------------------------------
 *.pt
 *.pth
@@ -130,6 +133,13 @@ wandb/
 *.joblib
 *.parquet
 .cache/
+fastembed_cache/
+.fastembed/
+chroma_db/
+.chroma/
+chroma/
+vector_store/
+faiss_index/
 
 # ------------------------------------------
 # Databases & Local Persistent Storage
@@ -140,6 +150,12 @@ wandb/
 *.db-journal
 *.db-wal
 *.db-shm
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite-journal
+*.sqlite3-journal
 career_twin.db
 pgdata/
 data/pgdata/
@@ -165,7 +181,7 @@ lerna-debug.log*
 .dvc/config.local
 
 # ------------------------------------------
-# User Uploads, Resumes & Runtime Cache
+# User Uploads, Resumes, Scratch & Runtime Cache
 # ------------------------------------------
 uploads/
 data/uploads/
@@ -173,6 +189,10 @@ data/resumes/
 data/jobs/live_market_weights.json
 temp/
 tmp/
+scratch/
+*.scratch
+.gemini/
+.antigravity/
 *.pdf
 *.docx
 

@@ -28,9 +28,12 @@ class CareerTwinState(TypedDict):
     # Radar dimensions
     radar_dimensions: Optional[Dict[str, float]]
     jd_radar_dimensions: Optional[Dict[str, float]]
+    jd_benchmark_dimensions: Optional[Dict[str, float]]
     market_corpus_version: Optional[str]
     force_live_refresh: Optional[bool]
 
     # Project Quality & Evidence Breakdown
     resume_quality_breakdown: Optional[Dict[str, Any]]
     project_quality_score: Optional[float]
+    jd_quality_breakdown: Optional[Dict[str, Any]]
+    jd_project_quality_score: Optional[float]

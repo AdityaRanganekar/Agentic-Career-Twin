@@ -56,6 +56,38 @@ def validation_router(state: CareerTwinState) -> str:
     logger.info(f"Validation failed. Retrying Recommendation Agent (Attempt {retries}/3).")
     return "retry"
 
+def profile_router(state: CareerTwinState) -> str:
+    """
+    Conditionally routes after ProfileAgent:
+    - If valid target_role is provided: route to MarketAgent.
+    - Else if target_jd_text is provided: route directly to JDExtractorAgent (skip MarketAgent).
+    - Otherwise: route directly to GapAgent.
+    """
+    target_role = state.get("target_role")
+    has_role = bool(
+        target_role 
+        and str(target_role).strip() 
+        and str(target_role).strip().lower() not in {"", "none", "null", "target job posting", "custom job posting"}
+    )
+    has_jd = bool(state.get("target_jd_text") and str(state.get("target_jd_text")).strip())
+
+    if has_role:
+        return "market_agent"
+    elif has_jd:
+        return "jd_extractor"
+    return "gap_agent"
+
+def market_router(state: CareerTwinState) -> str:
+    """
+    Conditionally routes after MarketAgent:
+    - If target_jd_text is provided: route to JDExtractorAgent.
+    - Otherwise: skip JD extraction and route directly to GapAgent.
+    """
+    has_jd = bool(state.get("target_jd_text") and str(state.get("target_jd_text")).strip())
+    if has_jd:
+        return "jd_extractor"
+    return "gap_agent"
+
 def compile_career_twin_graph(db_session):
     """Builds and compiles the LangGraph state machine."""
 
@@ -67,13 +99,6 @@ def compile_career_twin_graph(db_session):
         
     def recommendation_node(state: CareerTwinState):
         return run_recommendation_agent(state, db_session)
-
-    def jd_router(state: CareerTwinState) -> str:
-        """Routes to JDExtractorAgent only when target_jd_text is provided."""
-        target_jd = state.get("target_jd_text")
-        if target_jd and str(target_jd).strip():
-            return "jd_extractor"
-        return "gap_agent"
 
     def jd_node(state: CareerTwinState):
         return run_jd_extractor_agent(state, db_session)
@@ -91,10 +116,18 @@ def compile_career_twin_graph(db_session):
     workflow.add_node("Validator", run_validator)
 
     workflow.set_entry_point("ProfileAgent")
-    workflow.add_edge("ProfileAgent", "MarketAgent")
+    workflow.add_conditional_edges(
+        "ProfileAgent",
+        profile_router,
+        {
+            "market_agent": "MarketAgent",
+            "jd_extractor": "JDExtractorAgent",
+            "gap_agent": "GapAgent"
+        }
+    )
     workflow.add_conditional_edges(
         "MarketAgent",
-        jd_router,
+        market_router,
         {
             "jd_extractor": "JDExtractorAgent",
             "gap_agent": "GapAgent"

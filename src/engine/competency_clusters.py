@@ -55,8 +55,81 @@ def stem_token(t: str) -> str:
         return t_clean[:-1]
     return t_clean
 
+CATEGORY_CANONICAL_MAP: Dict[str, str] = {
+    # Databases & Storage
+    "relational databases (sql)": "Databases & Storage",
+    "nosql databases": "Databases & Storage",
+    "cloud data warehouses": "Databases & Storage",
+    "data storage": "Databases & Storage",
+    "nosql & document/key-value databases": "Databases & Storage",
+    "databases": "Databases & Storage",
+    # Backend & APIs
+    "backend & api development": "Backend & APIs",
+    "backend development": "Backend & APIs",
+    "api development": "Backend & APIs",
+    # Cloud & DevOps
+    "cloud & infrastructure": "Cloud & DevOps",
+    "cloud infrastructure & platforms": "Cloud & DevOps",
+    "containers, linux & devops": "Cloud & DevOps",
+    "devops & infrastructure": "Cloud & DevOps",
+    "cloud platforms": "Cloud & DevOps",
+    "modern tooling": "Cloud & DevOps",
+    # Machine Learning & AI
+    "deep learning frameworks": "Machine Learning & AI",
+    "classical ml & scientific python": "Machine Learning & AI",
+    "scientific python": "Machine Learning & AI",
+    "machine learning & ai": "Machine Learning & AI",
+    # Generative AI & LLMs
+    "genai, llms & nlp": "Generative AI & LLMs",
+    "generative ai & llms": "Generative AI & LLMs",
+    # Core Programming
+    "core programming languages": "Core Programming",
+    "core programming": "Core Programming",
+    # Frontend Development
+    "frontend & web development": "Frontend Development",
+    "frontend development": "Frontend Development",
+    # Data Analytics & BI
+    "bi, reporting & data visualization": "Data Analytics & BI",
+    # Data Engineering
+    "workflow orchestration & data pipelines": "Data Engineering",
+    "big data & distributed compute": "Data Engineering",
+    "data engineering": "Data Engineering",
+    # Quantitative & Statistical Analysis
+    "statistical & quantitative modeling": "Quantitative & Statistical Analysis",
+    "data analysis & statistics": "Quantitative & Statistical Analysis",
+    # Academic & Engineering Foundations
+    "academic & engineering foundations": "Academic & Engineering Foundations",
+    "engineering degree eligibility": "Academic & Engineering Foundations",
+    "engineering degree": "Academic & Engineering Foundations",
+    # Operations, Quality & Management
+    "operations & logistics": "Operations & Logistics",
+    "operations & process planning": "Operations & Logistics",
+    "production & logistics systems": "Operations & Logistics",
+    "quality & compliance": "Quality & Compliance",
+    "quality assurance & control": "Quality & Compliance",
+    "methodologies & management": "Methodologies & Management",
+    "agile methodologies": "Methodologies & Management"
+}
+
+def normalize_category_name(raw_cat: str) -> str:
+    """Normalizes raw category strings to canonical, non-overlapping 5-axis radar dimensions."""
+    if not raw_cat or not str(raw_cat).strip():
+        return "Core Programming"
+    c_clean = str(raw_cat).strip()
+    c_low = c_clean.lower()
+    return CATEGORY_CANONICAL_MAP.get(c_low, c_clean)
+
 # Baseline seed canonical taxonomy (Single Source of Truth for DB seeding and offline test fallback)
 BASELINE_CANONICAL_TAXONOMY: List[Dict[str, Any]] = [
+    {
+        "name": "Engineering Degree Eligibility (CS / AI-ML / Core Engineering)",
+        "category": "Academic & Engineering Foundations",
+        "aliases": [
+            "engineering degree", "b.tech", "b.e", "btech", "m.s", "b.s", "engineering",
+            "computer engineering", "mechanical engineering", "electrical engineering",
+            "electronics engineering", "chemical engineering", "civil engineering"
+        ]
+    },
     {
         "name": "Cloud Platforms (AWS / GCP / Azure)",
         "category": "Cloud & Infrastructure",
@@ -365,7 +438,7 @@ class TaxonomyConceptEngine:
                         continue
                     canonical = r.name.strip()
                     c_low = canonical.lower()
-                    self.category_by_concept[c_low] = cat_clean
+                    self.category_by_concept[c_low] = normalize_category_name(cat_clean)
                     if c_low not in self.aliases_by_concept:
                         self.aliases_by_concept[c_low] = set()
                     self.aliases_by_concept[c_low].add(c_low)
@@ -385,7 +458,7 @@ class TaxonomyConceptEngine:
         for item in BASELINE_CANONICAL_TAXONOMY:
             canonical = item["name"]
             c_low = canonical.lower()
-            category = item["category"]
+            category = normalize_category_name(item["category"])
             self.category_by_concept[c_low] = category
             if c_low not in self.aliases_by_concept:
                 self.aliases_by_concept[c_low] = set()
@@ -417,11 +490,15 @@ class TaxonomyConceptEngine:
         s_clean = skill_name.strip()
         s_low = s_clean.lower()
 
+        # 0. Immediate degree eligibility check (avoid splitting constituent branch tokens into tech categories)
+        if any(term in s_low for term in ["engineering degree", "degree eligibility", "academic & engineering"]):
+            return "Academic & Engineering Foundations"
+
         # 1. Direct concept category
         if s_low in self.category_by_concept:
             cat = self.category_by_concept[s_low]
             if cat and cat != "Technical Competency":
-                return cat
+                return normalize_category_name(cat)
 
         # 2. Alias lookup
         canonical = self.concept_by_alias.get(s_low)
@@ -430,7 +507,7 @@ class TaxonomyConceptEngine:
             if c_low in self.category_by_concept:
                 cat = self.category_by_concept[c_low]
                 if cat and cat != "Technical Competency":
-                    return cat
+                    return normalize_category_name(cat)
 
         # 3. Compound skill breakdown (split on /, &, (, +, -)
         if any(sep in s_clean for sep in ["/", "&", "(", "+"]):
@@ -442,36 +519,40 @@ class TaxonomyConceptEngine:
                 if part in self.category_by_concept:
                     cat = self.category_by_concept[part]
                     if cat and cat != "Technical Competency":
-                        return cat
+                        return normalize_category_name(cat)
                 part_canonical = self.concept_by_alias.get(part)
                 if part_canonical:
                     pc_low = part_canonical.lower()
                     if pc_low in self.category_by_concept:
                         cat = self.category_by_concept[pc_low]
                         if cat and cat != "Technical Competency":
-                            return cat
+                            return normalize_category_name(cat)
 
         # 4. Keyword heuristic mapping for common modern domains
         domain_keywords = [
             ({"llm", "prompt", "genai", "generative", "agent", "rag", "transformer", "nlp", "bert", "gpt", "fine-tuning", "fine tuning"}, "Generative AI & LLMs"),
             ({"deep learning", "neural", "pytorch", "tensorflow", "keras", "vision", "cv", "machine learning", "ml"}, "Machine Learning & AI"),
-            ({"cloud", "aws", "gcp", "azure", "docker", "kubernetes", "k8s", "devops", "ci/cd", "infrastructure", "linux"}, "Cloud & Infrastructure"),
+            ({"cloud", "aws", "gcp", "azure", "docker", "kubernetes", "k8s", "devops", "ci/cd", "infrastructure", "linux"}, "Cloud & DevOps"),
             ({"database", "sql", "nosql", "postgres", "mongodb", "redis", "warehouse", "snowflake", "storage"}, "Databases & Storage"),
-            ({"api", "backend", "fastapi", "flask", "django", "microservices", "rest"}, "Backend Development"),
+            ({"api", "backend", "fastapi", "flask", "django", "microservices", "rest"}, "Backend & APIs"),
             ({"python", "java", "c++", "golang", "programming", "code", "coding"}, "Core Programming"),
             ({"data structure", "algorithm", "cs", "computer science"}, "Computer Science Foundations"),
             ({"system design", "architecture", "distributed", "scalability"}, "Architecture & Systems"),
-            ({"design", "ood", "oop", "debugging", "testing", "quality"}, "Software Engineering"),
-            ({"git", "github", "repository", "tooling", "copilot", "cursor"}, "Modern Tooling")
+            ({"design", "ood", "oop", "debugging"}, "Software Engineering"),
+            ({"git", "github", "repository", "tooling", "copilot", "cursor"}, "Cloud & DevOps"),
+            ({"operation", "operations", "process planning", "process", "manufacturing", "supply chain", "logistics", "production"}, "Operations & Logistics"),
+            ({"quality assurance", "quality control", "qa", "qc", "inspection", "compliance", "testing"}, "Quality & Compliance"),
+            ({"agile", "scrum", "sprint", "kanban", "project management", "methodologies"}, "Methodologies & Management"),
+            ({"engineering degree", "degree eligibility", "academic & engineering foundations"}, "Academic & Engineering Foundations")
         ]
         for kw_set, target_cat in domain_keywords:
-            if any(kw in s_low for kw in kw_set):
-                return target_cat
+            if any(re.search(r'\b' + re.escape(kw) + r'\b', s_low) for kw in kw_set):
+                return normalize_category_name(target_cat)
 
         _, category, _ = self.get_canonical_concept(skill_name)
         if category == "Technical Competency":
             return "Core Programming"
-        return category
+        return normalize_category_name(category)
 
     def match_requirement(
         self,
@@ -535,11 +616,48 @@ class TaxonomyConceptEngine:
                 return 0.85, "compiled_language"
 
         # Git / Version Control implicit equivalency: Production cloud/container pipelines imply version control
-        if req_lower in {"git", "version control", "version control & code repositories", "code repository", "code repositories", "code repository management", "repository management"}:
+        if req_lower in {"git", "version control", "version control systems", "version control & code repositories", "code repository", "code repositories", "code repository management", "repository management", "vcs"}:
             if any(s in normalized_student_skills or s in student_tokens for s in ["git", "github", "gitlab", "bitbucket"]):
                 return 1.0, "git_vcs"
             if any(s in normalized_student_skills or s in student_tokens for s in ["docker", "kubernetes", "aws", "gcp", "azure", "apache airflow", "airflow", "ci/cd", "fastapi"]):
                 return 0.85, "cloud_pipeline_git_implicit"
+
+        # Object-Oriented Design (OOD) functional equivalency
+        if any(term in req_lower for term in ["object-oriented design", "object oriented design", "ood", "object-oriented design principles", "object-oriented programming", "oop"]):
+            oop_languages = {"python", "java", "c++", "cpp", "c#", "typescript", "golang", "go", "ruby"}
+            has_oop_lang = any(s in normalized_student_skills or s in student_tokens for s in oop_languages)
+            eng_tokens = {"software", "engineer", "engineering", "developer", "development", "computer", "b.tech", "b.e", "btech", "m.s", "b.s", "cs", "intern"}
+            has_eng_exp_or_deg = any(t in student_tokens or t in normalized_student_skills for t in eng_tokens)
+            if has_oop_lang and has_eng_exp_or_deg:
+                return 0.88, "oop_language_and_engineering"
+            elif has_oop_lang:
+                return 0.80, "oop_language"
+
+        # Cloud-Native Architectures & Microservices / Distributed Systems
+        if any(term in req_lower for term in ["cloud-native", "cloud native", "microservices", "distributed systems", "distributed computing", "cloud-native architectures"]):
+            cloud_tokens = {"aws", "gcp", "azure", "cloud", "amazon web services", "google cloud"}
+            infra_tokens = {"docker", "kubernetes", "k8s", "fastapi", "airflow", "apache airflow", "microservices", "distributed", "flask", "django"}
+            has_cloud = any(t in student_tokens or t in normalized_student_skills for t in cloud_tokens)
+            has_infra = any(t in student_tokens or t in normalized_student_skills for t in infra_tokens)
+            if has_cloud and has_infra:
+                return 0.90, "cloud_and_container_microservices"
+            elif has_cloud or has_infra:
+                return 0.75, "cloud_or_container_partial"
+
+        # Software Development Lifecycle (SDLC) & CI/CD Principles
+        if any(term in req_lower for term in ["sdlc", "software development lifecycle", "ci/cd", "ci/cd principles"]):
+            devops_tokens = {"docker", "kubernetes", "git", "github", "gitlab", "ci/cd", "continuous integration", "jenkins", "actions", "aws", "gcp"}
+            if any(t in student_tokens or t in normalized_student_skills for t in devops_tokens):
+                return 0.85, "sdlc_devops_workflow"
+
+        # Academic & Engineering Degree Eligibility (Campus Placement / Multi-Branch Notices)
+        if any(term in req_lower for term in ["engineering degree", "degree eligibility", "technical degree", "engineering / technical degree"]):
+            degree_tokens = {
+                "engineering", "b.tech", "b.e", "btech", "m.s", "b.s", "computer", "mechanical",
+                "electrical", "electronics", "chemical", "civil", "ai/ml", "data science", "bachelor", "master"
+            }
+            if any(t in student_tokens or t in normalized_student_skills for t in degree_tokens):
+                return 1.0, "engineering_degree_eligible"
 
         # Step 3: Compound Skill Matching (Slash, Ampersand, Parentheses, etc.)
         # e.g., "LangChain / LangGraph", "PyTorch / Deep Learning", "Docker & Cloud (AWS/GCP)", "SQL / NoSQL Databases"
@@ -655,12 +773,13 @@ def get_role_radar_categories(
     """
     Determines the top 5 distinct competency categories for the given role
     by aggregating the weights of its required skills across categories in PostgreSQL.
+    Guarantees canonical, non-overlapping category names.
     """
     engine = TaxonomyConceptEngine.get_instance(db)
     cat_weights: Dict[str, float] = {}
 
     for skill, weight in target_weights.items():
-        cat = engine.get_category(skill)
+        cat = normalize_category_name(engine.get_category(skill))
         cat_weights[cat] = cat_weights.get(cat, 0.0) + weight
 
     sorted_cats = [c for c, _ in sorted(cat_weights.items(), key=lambda x: x[1], reverse=True)]
@@ -671,12 +790,13 @@ def get_role_radar_categories(
         "Architecture & Systems",
         "Software Engineering",
         "Databases & Storage",
-        "Cloud & Infrastructure"
+        "Cloud & DevOps"
     ]
     for fb in STANDARD_FALLBACKS:
+        norm_fb = normalize_category_name(fb)
         if len(sorted_cats) >= 5:
             break
-        if fb not in sorted_cats:
-            sorted_cats.append(fb)
+        if norm_fb not in sorted_cats:
+            sorted_cats.append(norm_fb)
 
     return sorted_cats[:5]
