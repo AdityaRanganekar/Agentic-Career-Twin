@@ -1,8 +1,10 @@
 import json
 import google.generativeai as genai
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from sqlalchemy.orm import Session
 from src.domain.state import CareerTwinState
 from src.domain.schemas import JDExtractionResult
+from src.engine.competency_clusters import consolidate_target_weights
 from src.llm.client import get_gemini_client
 from src.llm.prompts import JD_EXTRACTION_PROMPT
 from src.utils.logger import get_custom_logger
@@ -15,10 +17,11 @@ NOISE_WORDS = {
     "bachelor's degree", "master's degree", "phd", "degree", "years of experience"
 }
 
-def run_jd_extractor_agent(state: CareerTwinState) -> Dict[str, Any]:
+def run_jd_extractor_agent(state: CareerTwinState, db: Optional[Session] = None) -> Dict[str, Any]:
     """
-    Extracts core and nice-to-have technical skills from an uploaded target Job Description (JD).
+    Extracts core and nice-to-have technical and professional competencies from an uploaded target Job Description (JD).
     Converts extracted skills into weighted requirements (1.0 for core, 0.5 for nice-to-have).
+    Consolidates sibling alternatives across any domain dynamically via the PostgreSQL taxonomy.
     """
     target_jd_text = state.get("target_jd_text")
     if not target_jd_text or not target_jd_text.strip():
@@ -58,9 +61,11 @@ def run_jd_extractor_agent(state: CareerTwinState) -> Dict[str, Any]:
             if clean and clean.lower() not in NOISE_WORDS and clean not in jd_weights:
                 jd_weights[clean] = 0.5
 
+        # --- POST-PROCESSING: Consolidate sibling alternatives via Database Taxonomy ---
+        jd_weights = consolidate_target_weights(jd_weights, db=db)
+
         logger.info(
-            f"JD extraction complete: {len(result.core_required_skills)} core skills, "
-            f"{len(result.nice_to_have_skills)} nice-to-have skills."
+            f"JD extraction complete: {len(jd_weights)} final weighted technical requirements."
         )
 
         return {"jd_extracted_reqs": jd_weights}

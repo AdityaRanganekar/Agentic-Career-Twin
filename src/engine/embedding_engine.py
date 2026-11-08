@@ -111,9 +111,9 @@ class EmbeddingEngine:
             return DOMAIN_EXPANSIONS[clean]
             
         if clean in ACRONYM_EXPANSIONS:
-            return f"Technical skill: {ACRONYM_EXPANSIONS[clean]}"
+            return ACRONYM_EXPANSIONS[clean]
             
-        return f"Technical skill: {raw_skill.strip()}"
+        return raw_skill.strip()
 
     def compute_similarity_matrix(
         self,
@@ -146,3 +146,12 @@ class EmbeddingEngine:
 
         similarity_matrix = cosine_similarity(student_vectors, market_vectors)
         return similarity_matrix
+
+    def compute_similarity(self, text_a: str, text_b: str) -> float:
+        """
+        Computes cosine similarity between two arbitrary texts (e.g. for semantic role alignment).
+        """
+        if not text_a or not text_b:
+            return 0.0
+        vecs = self.model.encode([text_a, text_b], convert_to_numpy=True, normalize_embeddings=True)
+        return float(np.dot(vecs[0], vecs[1]))

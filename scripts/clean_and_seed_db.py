@@ -12,14 +12,14 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 
-from src.db.session import SessionLocal
+from src.db.session import SessionLocal, init_db, engine
 from src.db.models import (
     Base, Student, StudentTwin, AnalysisRun,
     Market, MarketSnapshot, Job, JobSkill,
     Taxonomy, Resources
 )
 from src.db.crud import save_market_snapshot, upsert_job
-from src.engine.competency_clusters import COMPETENCY_CLUSTERS
+from src.engine.competency_clusters import COMPETENCY_CLUSTERS, BASELINE_CANONICAL_TAXONOMY
 from src.utils.hashing import hash_text
 from src.utils.logger import get_custom_logger
 
@@ -98,6 +98,22 @@ CORE_TEN_ROLES = {
         "Statistical Modeling": 0.95, "Time-Series Analysis": 0.92, "Econometrics": 0.88,
         "Stochastic Calculus": 0.85, "Machine Learning": 0.85, "NumPy": 0.88,
         "Pandas": 0.88, "SQL": 0.80, "Linear Algebra": 0.88, "Mathematics": 0.90
+    },
+    "AI Engineer": {
+        "Python": 0.98, "PyTorch": 0.94, "LLMs": 0.96, "Transformers": 0.92,
+        "LangChain": 0.90, "LangGraph": 0.88, "RAG": 0.92, "HuggingFace": 0.90,
+        "Vector Databases": 0.85, "Prompt Engineering": 0.82, "NLP": 0.90,
+        "FastAPI": 0.82, "Docker": 0.85, "Fine-Tuning": 0.85, "Git": 0.80
+    },
+    "Agentic AI Engineer": {
+        "Python": 0.98, "LangGraph": 0.95, "LangChain": 0.92, "Autonomous Agents": 0.94,
+        "Agentic AI": 0.95, "LLMs": 0.92, "RAG": 0.90, "Vector Databases": 0.88,
+        "Prompt Engineering": 0.85, "FastAPI": 0.85, "Docker": 0.82, "PyTorch": 0.78, "Git": 0.80
+    },
+    "Site Reliability Engineer": {
+        "Linux": 0.95, "Kubernetes": 0.92, "Docker": 0.90, "Terraform": 0.88,
+        "AWS": 0.85, "Python": 0.85, "Go": 0.80, "CI/CD": 0.88,
+        "Prometheus": 0.82, "Grafana": 0.80, "Bash": 0.85, "Networking": 0.82
     }
 }
 
@@ -156,26 +172,164 @@ def clean_taxonomies(db: Session):
     db.commit()
     logger.info(f"Deleted {deleted_cats} non-technical taxonomy rows across disallowed categories.")
 
-    # Ensure technical skills from COMPETENCY_CLUSTERS exist
+    # Cache existing taxonomy names to avoid unique constraint collisions
+    existing_tax_rows = db.query(Taxonomy).all()
+    tax_by_name = {r.name.lower().strip(): r for r in existing_tax_rows if r.name}
+
     added_skills = 0
     updated_aliases = 0
+
+    # 1. Ensure technical concepts from BASELINE_CANONICAL_TAXONOMY exist with their sibling aliases
+    for item in BASELINE_CANONICAL_TAXONOMY:
+        canonical_name = item["name"].strip()
+        cat = item["category"]
+        aliases = [str(a).strip().lower() for a in item["aliases"] if str(a).strip()]
+        name_key = canonical_name.lower()
+
+        if name_key not in tax_by_name:
+            new_tax = Taxonomy(category=cat, name=canonical_name, aliases=aliases)
+            db.add(new_tax)
+            tax_by_name[name_key] = new_tax
+            added_skills += 1
+        else:
+            existing = tax_by_name[name_key]
+            existing.category = cat
+            curr_aliases = set(str(a).lower() for a in (existing.aliases or []))
+            new_aliases = [a for a in aliases if a not in curr_aliases]
+            if new_aliases:
+                existing.aliases = list(existing.aliases or []) + new_aliases
+                updated_aliases += 1
+
+    # 2. Also ensure specific skills from clusters are present
     for cluster_name, skills in COMPETENCY_CLUSTERS.items():
         for skill in skills:
             canonical = skill.strip().title()
-            existing = db.query(Taxonomy).filter(func.lower(Taxonomy.name) == skill.lower()).first()
-            if not existing:
+            name_key = canonical.lower()
+            if name_key not in tax_by_name:
                 aliases = [skill.lower()]
                 if len(skill.split()) > 1:
                     aliases.append("".join(w[0] for w in skill.split()).lower())
-                db.add(Taxonomy(category=cluster_name, name=canonical, aliases=aliases))
+                new_tax = Taxonomy(category=cluster_name, name=canonical, aliases=aliases)
+                db.add(new_tax)
+                tax_by_name[name_key] = new_tax
                 added_skills += 1
             else:
+                existing = tax_by_name[name_key]
                 current_aliases = existing.aliases or []
                 if skill.lower() not in [a.lower() for a in current_aliases]:
                     existing.aliases = list(set(current_aliases + [skill.lower()]))
                     updated_aliases += 1
+
     db.commit()
     logger.info(f"Taxonomies enriched: Added {added_skills} technical skills, updated aliases for {updated_aliases}.")
+
+MODERN_COURSES = [
+    {
+        "title": "Vector Databases: from Embeddings to Applications",
+        "url": "https://www.deeplearning.ai/short-courses/vector-databases-embeddings-applications/",
+        "resource_type": "Course",
+        "target_skills": ["Vector Databases", "Embeddings", "Chroma", "Pinecone", "RAG", "Vector Search"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Building Systems with the ChatGPT API",
+        "url": "https://www.deeplearning.ai/short-courses/building-systems-with-chatgpt/",
+        "resource_type": "Course",
+        "target_skills": ["LLMs", "Prompt Engineering", "OpenAI", "API", "Generative AI"],
+        "difficulty_level": "Beginner"
+    },
+    {
+        "title": "Generative AI with Large Language Models",
+        "url": "https://www.coursera.org/learn/generative-ai-with-llms",
+        "resource_type": "Course",
+        "target_skills": ["LLMs", "Generative AI", "Transformers", "Fine-Tuning", "RLHF", "NLP"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Building and Evaluating Advanced RAG Applications",
+        "url": "https://www.deeplearning.ai/short-courses/building-evaluating-advanced-rag/",
+        "resource_type": "Course",
+        "target_skills": ["RAG", "Retrieval Augmented Generation", "Vector Databases", "LlamaIndex", "Embeddings"],
+        "difficulty_level": "Advanced"
+    },
+    {
+        "title": "LangChain for LLM Application Development",
+        "url": "https://www.deeplearning.ai/short-courses/langchain-for-llm-application-development/",
+        "resource_type": "Course",
+        "target_skills": ["LangChain", "LLMs", "Autonomous Agents", "Prompt Engineering", "Agents"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "AI Agents in Practice with LangGraph",
+        "url": "https://www.deeplearning.ai/short-courses/ai-agents-in-practice/",
+        "resource_type": "Course",
+        "target_skills": ["LangGraph", "Autonomous Agents", "Multi-Agent Workflows", "Agentic AI", "Human-in-the-Loop"],
+        "difficulty_level": "Advanced"
+    },
+    {
+        "title": "Hugging Face NLP Course",
+        "url": "https://huggingface.co/learn/nlp-course/",
+        "resource_type": "Course",
+        "target_skills": ["Transformers", "HuggingFace", "BERT", "Fine-Tuning", "NLP", "PyTorch"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Full Stack LLM BootCamp",
+        "url": "https://fullstackdeeplearning.com/llm-bootcamp/",
+        "resource_type": "Course",
+        "target_skills": ["LLMs", "FastAPI", "Docker", "MLOps", "Evaluation", "Deployment"],
+        "difficulty_level": "Advanced"
+    },
+    {
+        "title": "Production Machine Learning with MLOps",
+        "url": "https://www.coursera.org/specializations/machine-learning-engineering-for-production-mlops",
+        "resource_type": "Course",
+        "target_skills": ["MLOps", "CI/CD", "Docker", "Model Monitoring", "MLflow", "Drift Detection"],
+        "difficulty_level": "Advanced"
+    },
+    {
+        "title": "Docker & Kubernetes: The Practical Guide",
+        "url": "https://www.udemy.com/course/docker-kubernetes-the-practical-guide/",
+        "resource_type": "Course",
+        "target_skills": ["Docker", "Kubernetes", "DevOps", "Containers", "CI/CD"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Snowflake Masterclass: Cloud Data Warehousing & Architecture",
+        "url": "https://www.udemy.com/course/ultimate-snowpro-core-certification-course/",
+        "resource_type": "Course",
+        "target_skills": ["Snowflake", "Data Warehousing", "SQL", "Cloud Data", "BigQuery"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "MongoDB - The Complete Developer's Guide 2026",
+        "url": "https://www.udemy.com/course/nodejs-express-mongodb-bootcamp/",
+        "resource_type": "Course",
+        "target_skills": ["MongoDB", "NoSQL", "Databases", "Document Databases", "Redis"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Deep Learning Specialization with PyTorch & TensorFlow",
+        "url": "https://www.deeplearning.ai/courses/deep-learning-specialization/",
+        "resource_type": "Course",
+        "target_skills": ["Deep Learning", "PyTorch", "TensorFlow", "Keras", "Neural Networks", "CNNs"],
+        "difficulty_level": "Advanced"
+    },
+    {
+        "title": "Modern FastAPI & REST Microservices in Python",
+        "url": "https://testdriven.io/courses/fastapi-crud/",
+        "resource_type": "Course",
+        "target_skills": ["FastAPI", "REST API", "Microservices", "Python", "Docker"],
+        "difficulty_level": "Intermediate"
+    },
+    {
+        "title": "Data Structures & Algorithms in Python and C++",
+        "url": "https://www.udemy.com/course/data-structures-and-algorithms-deep-dive-using-python/",
+        "resource_type": "Course",
+        "target_skills": ["Data Structures", "Algorithms", "DSA", "LeetCode", "Problem Solving", "C++", "Python"],
+        "difficulty_level": "Intermediate"
+    }
+]
 
 def clean_and_tag_resources(db: Session):
     logger.info("Cleaning and tagging resources table...")
@@ -210,13 +364,41 @@ def clean_and_tag_resources(db: Session):
         r.target_skills = sorted(list(tags))
         tagged_count += 1
 
+    # Seed 10 modern 2024-2026 courses with explicit target_skills
+    seeded_modern = 0
+    for mc in MODERN_COURSES:
+        existing = db.query(Resources).filter(Resources.title == mc["title"]).first()
+        if not existing:
+            db.add(Resources(
+                title=mc["title"],
+                url=mc["url"],
+                resource_type=mc["resource_type"],
+                target_skills=mc["target_skills"],
+                difficulty_level=mc["difficulty_level"]
+            ))
+            seeded_modern += 1
+        else:
+            existing.target_skills = mc["target_skills"]
+            existing.url = mc["url"]
+
     db.commit()
-    logger.info(f"Resources cleaned: Deleted {deleted_count} non-technical courses, tagged {tagged_count} technical courses.")
+    logger.info(f"Resources cleaned: Deleted {deleted_count} non-technical courses, tagged {tagged_count} technical courses, seeded {seeded_modern} modern AI/ML courses.")
 
 def seed_jobs_and_snapshots(db: Session):
-    logger.info("Seeding 10 core roles into jobs, job_skills, market_snapshots, and market_data...")
+    logger.info("Purging corrupted roles and seeding core roles into jobs, job_skills, market_snapshots, and market_data...")
     now_utc = datetime.now(timezone.utc)
     
+    # 0. Delete corrupted non-tech jobs and market rows (Remotive scraped junk)
+    junk_roles = [
+        "content reviewer", "freelance copywriter", "copywriter", "writer",
+        "customer service", "telemarketer", "data entry", "administrative assistant"
+    ]
+    for jr in junk_roles:
+        db.execute(text("DELETE FROM market_data WHERE lower(role_name) LIKE :pat"), {"pat": f"%{jr}%"})
+        db.execute(text("DELETE FROM market_snapshots WHERE lower(target_role) LIKE :pat"), {"pat": f"%{jr}%"})
+        db.execute(text("DELETE FROM jobs WHERE lower(target_role) LIKE :pat OR lower(title) LIKE :pat"), {"pat": f"%{jr}%"})
+    db.commit()
+
     for role_name, weights in CORE_TEN_ROLES.items():
         # 1. Seed/Update MarketSnapshot
         save_market_snapshot(
@@ -295,6 +477,7 @@ def verify_all_tables(db: Session):
         logger.warning("Some table checks flagged anomalies; check logs above.\n")
 
 if __name__ == "__main__":
+    init_db()
     db = SessionLocal()
     try:
         clean_taxonomies(db)

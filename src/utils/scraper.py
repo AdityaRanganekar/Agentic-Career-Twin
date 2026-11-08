@@ -119,16 +119,24 @@ class JobMarketScraper:
         return []
 
     def fetch_remotive_jobs(self, role: str, limit: int = 15) -> List[Dict]:
-        """Free, zero-key remote tech jobs API from Remotive."""
+        """Free, zero-key remote jobs API from Remotive."""
         url = f"https://remotive.com/api/remote-jobs?search={urllib.parse.quote(role)}"
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 resp = client.get(url)
                 if resp.status_code == 200:
                     raw_jobs = resp.json().get("jobs", [])
+                    role_tokens = {w for w in re.findall(r'\w+', role.lower()) if len(w) > 2 and w not in {'and', 'the', 'for'}}
                     jobs = []
-                    for item in raw_jobs[:limit]:
+                    for item in raw_jobs:
                         title = item.get("title", "")
+                        title_lower = title.lower()
+
+                        # Ensure title matches the searched role tokens
+                        is_relevant = any(rt in title_lower for rt in role_tokens) if role_tokens else True
+                        if not is_relevant:
+                            continue
+
                         company = item.get("company_name", "")
                         loc = item.get("candidate_required_location", "Remote")
                         raw_desc = item.get("description", "")
@@ -145,28 +153,32 @@ class JobMarketScraper:
                             "source": "remotive",
                             "raw_payload": item
                         })
-                    logger.info(f"Fetched {len(jobs)} jobs for role '{role}' from Remotive.")
+                        if len(jobs) >= limit:
+                            break
+                    logger.info(f"Fetched {len(jobs)} filtered relevant jobs for role '{role}' from Remotive.")
                     return jobs
         except Exception as e:
             logger.warning(f"Remotive API fetch skipped or failed: {str(e)}")
         return []
 
     def fetch_arbeitnow_jobs(self, role: str, limit: int = 15) -> List[Dict]:
-        """Free, zero-key public tech jobs board API from Arbeitnow."""
+        """Free, zero-key public jobs board API from Arbeitnow."""
         url = "https://www.arbeitnow.com/api/job-board-api"
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 resp = client.get(url)
                 if resp.status_code == 200:
                     raw_data = resp.json().get("data", [])
-                    role_tokens = set(re.findall(r'\w+', role.lower()))
+                    role_tokens = {w for w in re.findall(r'\w+', role.lower()) if len(w) > 2 and w not in {'and', 'the', 'for'}}
                     jobs = []
                     for item in raw_data:
                         title = item.get("title", "")
                         tags = [t.lower() for t in item.get("tags", [])]
                         title_lower = title.lower()
-                        # Filter by role relevance
-                        if any(token in title_lower or token in tags for token in role_tokens):
+
+                        # Filter strictly by role tokens in title or tags
+                        is_relevant = (any(token in title_lower or token in tags for token in role_tokens)) if role_tokens else True
+                        if is_relevant:
                             company = item.get("company_name", "")
                             loc = item.get("location", "Remote")
                             raw_desc = item.get("description", "")
@@ -185,16 +197,16 @@ class JobMarketScraper:
                             })
                             if len(jobs) >= limit:
                                 break
-                    logger.info(f"Fetched {len(jobs)} jobs for role '{role}' from Arbeitnow.")
+                    logger.info(f"Fetched {len(jobs)} filtered relevant jobs for role '{role}' from Arbeitnow.")
                     return jobs
         except Exception as e:
             logger.warning(f"Arbeitnow API fetch skipped or failed: {str(e)}")
         return []
 
     def fetch_web_job_snippets(self, role: str, limit: int = 10) -> List[Dict]:
-        """Keyless DuckDuckGo live web search extracting technical skill requirements snippets."""
+        """Keyless DuckDuckGo live web search extracting domain skill requirements snippets."""
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        query = urllib.parse.quote(f"{role} job description required technical skills qualifications")
+        query = urllib.parse.quote(f"{role} job description required skills qualifications")
         url = f"https://html.duckduckgo.com/html/?q={query}"
         try:
             with httpx.Client(timeout=self.timeout, headers=headers) as client:

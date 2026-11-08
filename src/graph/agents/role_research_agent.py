@@ -6,6 +6,7 @@ If missing or expired, search Live Internet/APIs + Extract Core Skills via Gemin
 Save to DB with Timestamp -> Return Role Weights.
 """
 import os
+import re
 import json
 import yaml
 from datetime import datetime, timezone, timedelta
@@ -13,10 +14,10 @@ from typing import Dict, List, Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from src.db.models import Market, MarketSnapshot, Job, JobSkill
+from src.db.models import Market, MarketSnapshot, Job, JobSkill, Taxonomy
 from src.db.crud import save_market_snapshot, upsert_job
 from src.engine.embedding_engine import EmbeddingEngine
-from src.engine.competency_clusters import COMPETENCY_CLUSTERS, ONET_NOISE_WORDS
+from src.engine.competency_clusters import COMPETENCY_CLUSTERS, ONET_NOISE_WORDS, TaxonomyConceptEngine
 from src.domain.schemas import RoleSkillProfile, WeightedSkill
 from src.utils.scraper import JobMarketScraper
 from src.llm.client import get_gemini_client
@@ -37,6 +38,36 @@ def get_configured_ttl_days(config_path: str = "config.yaml") -> int:
     except Exception as e:
         logger.warning(f"Could not read TTL from {config_path}: {e}")
     return DEFAULT_TTL_DAYS
+
+DOMAIN_ROLE_FALLBACKS: Dict[str, Dict[str, float]] = {
+    "ai / llm engineer": {
+        "Python": 0.98, "LLMs & Prompt Engineering": 0.95, "LangChain / LangGraph": 0.92,
+        "RAG & Vector Databases": 0.90, "PyTorch / Deep Learning": 0.88, "Transformers & HuggingFace": 0.88,
+        "FastAPI & REST APIs": 0.85, "Docker & Cloud (AWS/GCP)": 0.82, "SQL / NoSQL Databases": 0.78,
+        "MLOps & Evaluation": 0.75, "Fine-Tuning": 0.85, "Git": 0.80
+    },
+    "ai engineer": {
+        "Python": 0.98, "LLMs & Prompt Engineering": 0.95, "LangChain / LangGraph": 0.92,
+        "RAG & Vector Databases": 0.90, "PyTorch / Deep Learning": 0.88, "Transformers & HuggingFace": 0.88,
+        "FastAPI & REST APIs": 0.85, "Docker & Cloud (AWS/GCP)": 0.82, "SQL / NoSQL Databases": 0.78,
+        "MLOps & Evaluation": 0.75, "Fine-Tuning": 0.85, "Git": 0.80
+    },
+    "agentic ai engineer": {
+        "Python": 0.98, "LLMs & Prompt Engineering": 0.95, "LangChain / LangGraph": 0.95,
+        "Autonomous Agents": 0.92, "RAG & Vector Databases": 0.90, "FastAPI & REST APIs": 0.88,
+        "Docker & Cloud (AWS/GCP)": 0.85, "PyTorch / Deep Learning": 0.85, "Transformers & HuggingFace": 0.85,
+        "MLOps & Evaluation": 0.78, "Git": 0.80
+    },
+    "site reliability engineer": {
+        "Linux / UNIX Systems": 0.98, "Kubernetes & Docker": 0.95, "Cloud Platforms (AWS / GCP / Azure)": 0.95,
+        "Terraform & IaC": 0.90, "CI/CD & GitHub Actions": 0.88, "Prometheus & Grafana Monitoring": 0.85,
+        "Python / Go Scripting": 0.85, "Networking & Security": 0.80, "Bash": 0.82, "Git": 0.80
+    },
+    "machine learning engineer": {
+        "Python": 0.98, "PyTorch": 0.95, "TensorFlow": 0.90, "Scikit-Learn": 0.92,
+        "Docker": 0.88, "AWS": 0.85, "MLflow": 0.85, "SQL": 0.85, "CI/CD": 0.80, "Git": 0.80
+    }
+}
 
 class RoleResearchAgent:
     """
@@ -182,13 +213,16 @@ class RoleResearchAgent:
         try:
             model = get_gemini_client()
             prompt = (
-                f"You are a Senior Technical Recruiter and Job Market Analyst. Analyze the following live job postings and requirements for the role '{target_role}':\n\n"
+                f"You are an Expert Industry Recruiter and Labor Market Analyst across all professional domains and industries. "
+                f"Analyze the following live job postings, market requirements, and industry standards for the role '{target_role}':\n\n"
                 f"{aggregated_context}\n\n"
-                f"Extract the TOP 12 to 15 MOST CRITICAL hard technical skills, programming languages, databases, cloud platforms, and frameworks required for '{target_role}'.\n"
+                f"Extract the TOP 10 to 15 MOST CRITICAL hard professional competencies, domain tools, software, platforms, methodologies, or qualifications required for '{target_role}'.\n"
                 f"Rules:\n"
-                f"1. Only include hard technical skills. Exclude soft skills, administrative fluff (e.g., 'communication', 'leadership', 'teamwork'), and office tools.\n"
-                f"2. Assign an importance weight between 0.20 and 1.00 based on market frequency and criticality.\n"
-                f"3. Return the exact JSON schema."
+                f"1. Only include hard domain competencies, technical/professional tools, methodologies, and standards. Exclude generic soft skills, administrative fluff (e.g., 'communication', 'leadership', 'teamwork'), and generic buzzwords.\n"
+                f"2. Group the skills into the TOP 5 distinct, clean, human-readable Competency Categories tailored specifically to this role (to serve as the 5 Radar Chart axes, e.g. for AI Engineer: 'Generative AI & LLMs', 'Machine Learning & AI', 'Cloud & MLOps', 'Backend & APIs', 'Databases & Storage'; for Financial Analyst: 'Financial Modeling & Valuation', 'Accounting & ERP Systems', 'Data & BI Analytics', 'Risk & Forecasting', 'Regulatory Compliance'; for Civil Engineer: 'Structural Analysis & Design', 'CAD & BIM Modeling', 'Geotechnical & Materials', 'Project Management & Estimation', 'Codes & Standards').\n"
+                f"3. For each skill, specify 'category' (one of the 5 categories), 'importance_weight' (0.20 to 1.00 based on criticality and frequency), and 'equivalent_aliases' (a list of sibling tools, libraries, or frameworks that satisfy this competency in that industry).\n"
+                f"4. Assign importance weight between 0.20 and 1.00.\n"
+                f"5. Return the exact JSON schema."
             )
             response = model.generate_content(
                 prompt,
@@ -205,29 +239,71 @@ class RoleResearchAgent:
                 if name.lower() not in ONET_NOISE_WORDS and len(name) > 1:
                     weights[name] = round(float(skill.importance_weight), 4)
 
-            logger.info(f"Gemini successfully synthesized {len(weights)} core skills for '{target_role}'.")
+                    # Persist discovered skill, category, and aliases to PostgreSQL taxonomies table
+                    try:
+                        existing_tax = db.query(Taxonomy).filter(func.lower(Taxonomy.name) == name.lower()).first()
+                        aliases = [str(a).strip() for a in (skill.equivalent_aliases or []) if str(a).strip()]
+                        if existing_tax:
+                            curr_aliases = set(str(a).lower() for a in (existing_tax.aliases or []))
+                            new_aliases = [a for a in aliases if a.lower() not in curr_aliases]
+                            if new_aliases:
+                                existing_tax.aliases = list(existing_tax.aliases or []) + new_aliases
+                        else:
+                            db.add(Taxonomy(
+                                name=name,
+                                category=skill.category or "General Technical",
+                                aliases=aliases
+                            ))
+                    except Exception as tax_err:
+                        logger.warning(f"Could not persist taxonomy for '{name}': {tax_err}")
+
+            try:
+                db.commit()
+                # Instantly refresh in-memory taxonomy engine
+                TaxonomyConceptEngine.get_instance().load_taxonomies(db)
+            except Exception as commit_tax_err:
+                db.rollback()
+                logger.warning(f"Could not commit taxonomy additions: {commit_tax_err}")
+
+            logger.info(f"Gemini successfully synthesized {len(weights)} core skills for '{target_role}' and synced taxonomies.")
         except Exception as llm_err:
             logger.warning(f"Gemini live role synthesis fallback triggered: {llm_err}")
 
-        # Fallback if Gemini or API unavailable: Frequency count from scraped jobs or generic technical core
+        # Fallback if Gemini or API unavailable: Domain-intelligent fallback or clean frequency count
         if len(weights) < 8:
-            logger.info("Using frequency aggregation fallback for live role weights.")
-            counts: Dict[str, int] = {}
-            for j in jobs:
-                for s in scraper.extract_skills_from_text(j.get("description", ""), known_tech_skills):
-                    counts[s] = counts.get(s, 0) + 1
-            if counts:
-                max_c = max(counts.values()) or 1
-                for s, c in sorted(counts.items(), key=lambda x: x[1], reverse=True)[:15]:
-                    weights[s] = round(c / max_c, 4)
+            clean_role_lower = target_role.strip().lower()
+            if clean_role_lower in DOMAIN_ROLE_FALLBACKS:
+                logger.info(f"Using domain-intelligent curated fallback for role '{target_role}'.")
+                weights = dict(DOMAIN_ROLE_FALLBACKS[clean_role_lower])
+            else:
+                for role_key, role_weights in DOMAIN_ROLE_FALLBACKS.items():
+                    if role_key in clean_role_lower or clean_role_lower in role_key:
+                        logger.info(f"Matched role '{target_role}' to domain fallback '{role_key}'.")
+                        weights = dict(role_weights)
+                        break
 
-        # Final safety net for rare completely offline cases
-        if len(weights) < 8:
-            weights = {
-                "Python": 1.0, "SQL": 0.85, "Git": 0.75, "Docker": 0.70,
-                "Linux": 0.70, "Cloud Platforms (AWS / GCP / Azure)": 0.80,
-                "Data Analysis": 0.65, "REST APIs": 0.60
-            }
+            if len(weights) < 8:
+                logger.info("Using frequency aggregation fallback for live role weights.")
+                counts: Dict[str, int] = {}
+                for j in jobs:
+                    for s in scraper.extract_skills_from_text(j.get("description", ""), known_tech_skills):
+                        if s.lower() not in ONET_NOISE_WORDS and len(s) > 1:
+                            counts[s] = counts.get(s, 0) + 1
+                if counts:
+                    max_c = max(counts.values()) or 1
+                    for s, c in sorted(counts.items(), key=lambda x: x[1], reverse=True)[:15]:
+                        weights[s] = round(c / max_c, 4)
+
+        # Final safety net for rare completely offline cases (Domain-agnostic dynamic generation)
+        if len(weights) < 5:
+            role_words = [w.capitalize() for w in re.findall(r'[a-zA-Z]+', target_role) if len(w) > 2 and w.lower() not in {'and', 'the', 'for', 'senior', 'junior', 'lead', 'staff'}]
+            core_name = " ".join(role_words) if role_words else target_role.title()
+            weights = {f"{core_name} Methodologies": 1.0}
+            for w in role_words[:3]:
+                weights[f"{w} Analysis & Execution"] = 0.85
+                weights[f"{w} Tools & Standards"] = 0.80
+            weights["Industry Quality & Standards"] = 0.75
+            weights["Domain Reporting & Evaluation"] = 0.70
 
         # 3. Persist newly discovered role to BOTH MarketSnapshot and Market (market_data) tables
         now_utc = datetime.now(timezone.utc)

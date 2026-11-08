@@ -18,6 +18,7 @@ def process_resume(pdf_bytes: bytes, db: Session) -> StudentTwinProfile:
     raw_text = extract_text_from_pdf(pdf_bytes)
 
     twin_profile = generate_student_twin(raw_text)
+    twin_profile.raw_resume_text = raw_text
  
     normalizer = SkillNormalizer(db)
     normalized_skills = []

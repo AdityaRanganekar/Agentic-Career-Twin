@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas-bg: #F3EEE3;
+  --card-bg: #FAF7F2;
+  --well-bg: #E8E1D3;
+  --ink-primary: #111111;
+  --ink-muted: #666666;
+  --ink-border: rgba(17, 17, 17, 0.12);
+  --accent-terracotta: #D9541E;
+}
+
+.theme-dark {
+  --canvas-bg: #111111;
+  --card-bg: #181818;
+  --well-bg: #222222;
+  --ink-primary: #F3EEE3;
+  --ink-muted: #94A3B8;
+  --ink-border: rgba(243, 238, 227, 0.15);
+  --accent-terracotta: #D9541E;
+}
+
+body {
+  background-color: var(--canvas-bg);
+  color: var(--ink-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Custom crisp scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(17, 17, 17, 0.2);
+  border-radius: 3px;
+}
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(243, 238, 227, 0.25);
+}
+
+/* Font utilities */
+.font-display {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+}
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}

@@ -43,13 +43,32 @@ def init_db():
     try:
         with engine.connect() as conn:
             # 1. Drop dead legacy tables permanently
-            conn.execute(text("DROP TABLE IF EXISTS career_assessments CASCADE;"))
-            conn.execute(text("DROP TABLE IF EXISTS user_profiles CASCADE;"))
-            # 2. Fix PostgreSQL schema migrations for analysis_runs
-            conn.execute(text("ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS target_jd_hash VARCHAR;"))
-            conn.execute(text("ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS jd_fit_score FLOAT;"))
+            try:
+                conn.execute(text("DROP TABLE IF EXISTS career_assessments CASCADE;"))
+                conn.execute(text("DROP TABLE IF EXISTS user_profiles CASCADE;"))
+            except Exception:
+                pass
+
+            # 2. Safe schema migrations for students and analysis_runs columns
+            col_migrations = [
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS username VARCHAR;",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR;",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS auth_provider VARCHAR DEFAULT 'local';",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS google_id VARCHAR;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS target_jd_hash VARCHAR;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS jd_fit_score FLOAT;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS project_quality_score FLOAT;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS jd_missing_skills JSON;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS recommended_resources JSON;",
+                "ALTER TABLE analysis_runs ADD COLUMN IF NOT EXISTS resume_filename VARCHAR;"
+            ]
+            for stmt in col_migrations:
+                try:
+                    conn.execute(text(stmt))
+                except Exception as col_err:
+                    logger.debug(f"Column migration step note: {col_err}")
             conn.commit()
-            logger.info("Database migration: dropped legacy tables and updated analysis_runs columns.")
+            logger.info("Database migration: dropped legacy tables and updated students / analysis_runs columns.")
     except Exception as e:
         logger.warning(f"Schema migration note in init_db: {e}")
     logger.info("Database tables initialized successfully.")

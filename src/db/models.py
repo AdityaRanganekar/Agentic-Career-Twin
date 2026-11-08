@@ -14,6 +14,10 @@ class Student(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=True)
+    username = Column(String, unique=True, index=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    auth_provider = Column(String, default="local")  # "local" or "google"
+    google_id = Column(String, unique=True, nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     analysis_runs = relationship("AnalysisRun", back_populates="student", cascade="all, delete-orphan")
@@ -28,7 +32,11 @@ class AnalysisRun(Base):
     target_jd_hash = Column(String, nullable=True, index=True)
     readiness_score = Column(Float, nullable=False)
     jd_fit_score = Column(Float, nullable=True)
+    project_quality_score = Column(Float, nullable=True)
     missing_skills = Column(JSON, default=list)
+    jd_missing_skills = Column(JSON, default=list)
+    recommended_resources = Column(JSON, default=list)
+    resume_filename = Column(String, nullable=True)
     timestamp = Column(DateTime, default=utc_now, index=True)
 
     student = relationship("Student", back_populates="analysis_runs")

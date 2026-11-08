@@ -75,12 +75,18 @@ def compile_career_twin_graph(db_session):
             return "jd_extractor"
         return "gap_agent"
 
+    def jd_node(state: CareerTwinState):
+        return run_jd_extractor_agent(state, db_session)
+
+    def gap_node(state: CareerTwinState):
+        return run_gap_agent(state, db_session)
+
     workflow = StateGraph(CareerTwinState)
 
     workflow.add_node("ProfileAgent", profile_node)
     workflow.add_node("MarketAgent", market_node)
-    workflow.add_node("JDExtractorAgent", run_jd_extractor_agent)
-    workflow.add_node("GapAgent", run_gap_agent)
+    workflow.add_node("JDExtractorAgent", jd_node)
+    workflow.add_node("GapAgent", gap_node)
     workflow.add_node("RecommendationAgent", recommendation_node)
     workflow.add_node("Validator", run_validator)
 
