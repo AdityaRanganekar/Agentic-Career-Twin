@@ -224,7 +224,7 @@ export const AuthPortal: React.FC = () => {
                   type="text"
                   value={loginIdentifier}
                   onChange={(e) => setLoginIdentifier(e.target.value)}
-                  placeholder="e.g. aditya or aditya@example.com"
+                  placeholder="Name or xyz@example.com"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-black/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#D9541E]"
                   required
                 />
@@ -263,7 +263,7 @@ export const AuthPortal: React.FC = () => {
                   type="text"
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
-                  placeholder="e.g. Aditya Ranganekar"
+                  placeholder="Full Name"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-black/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#D9541E]"
                 />
               </div>
@@ -276,7 +276,7 @@ export const AuthPortal: React.FC = () => {
                   type="text"
                   value={signupUsername}
                   onChange={(e) => setSignupUsername(e.target.value)}
-                  placeholder="e.g. aditya"
+                  placeholder="UserName"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-black/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#D9541E]"
                   required
                 />
@@ -290,7 +290,7 @@ export const AuthPortal: React.FC = () => {
                   type="email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
-                  placeholder="e.g. aditya@example.com"
+                  placeholder="xyz@example.com"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-black/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#D9541E]"
                   required
                 />
