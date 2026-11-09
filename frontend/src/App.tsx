@@ -14,6 +14,7 @@ const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [targetRole, setTargetRole] = useState('');
   const [latestResult, setLatestResult] = useState<AnalysisResult | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (!user) {
     return <AuthPortal />;
@@ -47,13 +48,20 @@ const MainLayout: React.FC = () => {
     }
   };
 
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div className="flex min-h-screen bg-[var(--canvas-bg)] text-[var(--ink-primary)]">
-      {/* Sidebar Rail */}
+      {/* Sidebar Rail / Mobile Drawer */}
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         targetRole={targetRole}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Main Content Area */}
@@ -61,12 +69,14 @@ const MainLayout: React.FC = () => {
         <Header
           title={getTabTitle()}
           subtitle={getTabSubtitle()}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="w-full min-w-0 flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-10 py-4 sm:py-6 max-w-7xl mx-auto">
           {activeTab === 'overview' && (
             <DashboardView
-              onNavigateTab={setActiveTab}
+              onNavigateTab={handleTabChange}
               targetRole={targetRole}
               setTargetRole={setTargetRole}
               latestResult={latestResult}
@@ -105,4 +115,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

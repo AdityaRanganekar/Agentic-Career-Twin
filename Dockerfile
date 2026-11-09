@@ -1,34 +1,28 @@
-# Multi-stage production container for Evidence-Grounded Agentic Career Twin
 FROM python:3.12-slim
 
-# Prevent Python from writing pyc files and buffer stdout/stderr
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV HF_HUB_OFFLINE=1
-ENV TRANSFORMERS_OFFLINE=1
-
-WORKDIR /app
-
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code and data assets
-COPY . .
+# Pre-bake the ONNX all-MiniLM-L6-v2 model into the Docker image layer during build
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2')"
 
-# Expose FastAPI (8000) and Streamlit (8501) ports
+COPY src/ ./src/
+COPY config.yaml ./config.yaml
+COPY scripts/ ./scripts/
+RUN mkdir -p /app/logs
+
 EXPOSE 8000
-EXPOSE 8501
 
-# Default command: launch FastAPI backend
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

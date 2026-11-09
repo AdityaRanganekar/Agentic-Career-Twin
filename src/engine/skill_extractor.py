@@ -17,6 +17,7 @@ logger = get_custom_logger(__name__)
 
 CACHE_DIR = "logs"
 CACHE_FILE = os.path.join(CACHE_DIR, "pdf_profile_cache.json")
+MAX_CACHE_ENTRIES = 250
 _PDF_PROFILE_CACHE: Dict[str, str] = {}
 
 def _load_cache():
@@ -24,7 +25,11 @@ def _load_cache():
     if os.path.exists(CACHE_FILE):
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                _PDF_PROFILE_CACHE = json.load(f)
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    # Keep bounded to MAX_CACHE_ENTRIES
+                    items = list(loaded.items())[-MAX_CACHE_ENTRIES:]
+                    _PDF_PROFILE_CACHE = dict(items)
             logger.info(f"Loaded {len(_PDF_PROFILE_CACHE)} cached resume profiles from {CACHE_FILE}")
         except Exception as e:
             logger.warning(f"Could not load PDF profile cache from {CACHE_FILE}: {e}")
@@ -35,6 +40,8 @@ def _save_cache():
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(_PDF_PROFILE_CACHE, f, indent=2)
+    except (OSError, PermissionError) as perm_err:
+        logger.debug(f"Ephemeral/read-only filesystem cache write skipped: {perm_err}")
     except Exception as e:
         logger.warning(f"Could not save PDF profile cache to {CACHE_FILE}: {e}")
 
@@ -128,8 +135,11 @@ def process_resume(pdf_bytes: bytes, db: Session) -> StudentTwinProfile:
     # 6. Deduplicate repeated skill mentions while keeping most recent evidence dates
     twin_profile.extracted_skills = SkillDeduplicator.deduplicate_skills(normalized_skills)
 
-    # 7. Persist to deterministic SHA-256 cache
+    # 7. Persist to deterministic SHA-256 cache (bounded)
     try:
+        if len(_PDF_PROFILE_CACHE) >= MAX_CACHE_ENTRIES:
+            oldest_key = next(iter(_PDF_PROFILE_CACHE))
+            _PDF_PROFILE_CACHE.pop(oldest_key, None)
         _PDF_PROFILE_CACHE[pdf_hash] = twin_profile.model_dump_json()
         _save_cache()
         logger.info(f"Persisted resume profile to SHA-256 cache for hash {pdf_hash[:12]}")

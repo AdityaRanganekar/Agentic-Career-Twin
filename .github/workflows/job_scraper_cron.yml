@@ -2,12 +2,14 @@ name: Weekly Live Job Market Ingestion & TF-IDF Refresh
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Every Sunday at midnight
+    - cron: '0 0 * * 0' # Every Sunday at midnight UTC
   workflow_dispatch:
 
 jobs:
   scrape-and-update:
+    name: Scrape Live Postings & Recompute TF-IDF Weights
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -18,7 +20,12 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpq-dev
+
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -30,6 +37,14 @@ jobs:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          PYTHONPATH: '.'
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "=================================================================================="
+            echo "NOTICE: DATABASE_URL secret is not configured in GitHub repository secrets."
+            echo "To enable live market ingestion, add your Neon PostgreSQL DATABASE_URL to secrets."
+            echo "Skipping weekly scrape cleanly without failing the job."
+            echo "=================================================================================="
+            exit 0
+          fi
           python scripts/refresh_market.py
-

@@ -46,33 +46,44 @@ class SkillNormalizer:
     def __init__(self, db: Session):
         self.db = db
         self._taxonomies: Optional[List[Taxonomy]] = None
+        self._exact_map: Optional[Dict[str, Taxonomy]] = None
+        self._alias_map: Optional[Dict[str, Taxonomy]] = None
 
-    def _get_taxonomies(self) -> List[Taxonomy]:
+    def _ensure_taxonomy_cache(self):
         if self._taxonomies is None:
             try:
                 self._taxonomies = self.db.query(Taxonomy).all()
             except Exception as e:
                 logger.warning(f"Failed to query taxonomies from DB: {e}")
                 self._taxonomies = []
+            self._exact_map = {t.name.strip().lower(): t for t in self._taxonomies if t.name}
+            self._alias_map = {}
+            for tax in self._taxonomies:
+                if tax.aliases:
+                    for a in tax.aliases:
+                        a_clean = str(a).strip().lower()
+                        if a_clean and a_clean not in self._alias_map:
+                            self._alias_map[a_clean] = tax
+
+    def _get_taxonomies(self) -> List[Taxonomy]:
+        self._ensure_taxonomy_cache()
         return self._taxonomies
 
     def normalize(self, raw_skill: str) -> Optional[str]:
         """
         Executes the deterministic Waterfall normalization pipeline:
-        1. Exact Match (case-insensitive) against taxonomy
-        2. Alias Dictionary Match (preserving tool identity and avoiding umbrella bucket replacement)
+        1. Exact Match (O(1) in-memory lookup) against taxonomy
+        2. Alias Dictionary Match (O(1) in-memory lookup) preserving tool identity
         3. Dense Vector Similarity Fallback (EmbeddingEngine with cosine similarity)
         """
         if not raw_skill or not raw_skill.strip():
             return None
 
         clean_skill = raw_skill.strip().lower()
+        self._ensure_taxonomy_cache()
 
-        # Step 1: Deterministic Exact Match
-        exact_match = self.db.query(Taxonomy).filter(
-            func.lower(Taxonomy.name) == clean_skill
-        ).first()
-        
+        # Step 1: Deterministic Exact Match (O(1) memory lookup)
+        exact_match = self._exact_map.get(clean_skill)
         if exact_match:
             # If matched row is an umbrella bucket, do NOT replace raw_skill with umbrella name
             if '/' in exact_match.name or '(' in exact_match.name or '&' in exact_match.name:
@@ -80,20 +91,18 @@ class SkillNormalizer:
             logger.debug(f"Exact match found: '{raw_skill}' -> '{exact_match.name}'")
             return exact_match.name
         
-        # Step 2: Deterministic Alias Match
-        all_taxonomies = self._get_taxonomies()
-        for tax in all_taxonomies:
-            aliases = [str(a).strip().lower() for a in tax.aliases] if tax.aliases else []
-            if clean_skill in aliases:
-                # If matched row is an umbrella bucket, return specific tool name, not umbrella name
-                if '/' in tax.name or '(' in tax.name or '&' in tax.name:
-                    return TOOL_CANONICAL_CASING.get(clean_skill, raw_skill.strip())
-                logger.debug(f"Alias match found: '{raw_skill}' -> '{tax.name}'")
-                return tax.name
+        # Step 2: Deterministic Alias Match (O(1) memory lookup)
+        alias_match = self._alias_map.get(clean_skill)
+        if alias_match:
+            # If matched row is an umbrella bucket, return specific tool name, not umbrella name
+            if '/' in alias_match.name or '(' in alias_match.name or '&' in alias_match.name:
+                return TOOL_CANONICAL_CASING.get(clean_skill, raw_skill.strip())
+            logger.debug(f"Alias match found: '{raw_skill}' -> '{alias_match.name}'")
+            return alias_match.name
 
         # Step 3: Vector Similarity Fallback
         logger.debug(f"Skill '{raw_skill}' not found deterministically. Triggering vector fallback.")
-        return self._vector_fallback(clean_skill, all_taxonomies)
+        return self._vector_fallback(clean_skill, self._taxonomies)
 
     def _vector_fallback(self, clean_skill: str, taxonomies: List[Taxonomy]) -> Optional[str]:
         """

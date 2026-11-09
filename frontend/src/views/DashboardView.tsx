@@ -178,9 +178,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return result;
       });
     } catch (err: any) {
-      setErrorMessage(
-        err?.response?.data?.detail || 'Assessment failed. Ensure FastAPI is running on port 8000.'
-      );
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setErrorMessage('Assessment timed out after 45 seconds. The server took too long to respond. Please try again.');
+      } else {
+        setErrorMessage(
+          err?.response?.data?.detail || 'Assessment failed. Ensure FastAPI is running on port 8000.'
+        );
+      }
     } finally {
       clearTimeout(timer1);
       clearTimeout(timer2);
@@ -216,22 +220,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ----------------------------------------------------------- */}
       {/* TOP-LEVEL SERVICE SWITCHER: TARGET DISCIPLINE | TARGET JD    */}
       {/* ----------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-2 rounded-2xl bg-canvas-card dark:bg-black/40 border border-black/15 dark:border-white/15 shadow-crisp transition-colors duration-300 ease-in-out">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-canvas-card dark:bg-black/40 border border-black/15 dark:border-white/15 shadow-crisp transition-colors duration-300 ease-in-out">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {/* Tab 1: Target Discipline */}
           <button
             type="button"
             onClick={() => setActiveServiceTab('discipline')}
-            className={`flex-1 sm:flex-initial flex items-center gap-2.5 px-5 py-3 rounded-xl font-display text-sm font-bold transition-all duration-200 ease-in-out ${
+            className={`w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-display text-xs sm:text-sm font-bold transition-all duration-200 ease-in-out ${
               activeServiceTab === 'discipline'
                 ? 'bg-[#111111] text-[#F3EEE3] dark:bg-[#F3EEE3] dark:text-[#111111] shadow-elevated'
                 : 'text-neutral-600 dark:text-neutral-400 hover:text-[#111111] dark:hover:text-[#F3EEE3] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
           >
-            <Target className="w-4 h-4 text-[#D9541E]" />
-            <span>Target Discipline</span>
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-[#D9541E] shrink-0" />
+              <span>Target Discipline</span>
+            </div>
             {targetRole ? (
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-black/10 dark:bg-black/20 text-[#D9541E] font-semibold border border-[#D9541E]/30">
+              <span className="text-[10px] sm:text-[11px] font-mono px-2 py-0.5 rounded-md bg-black/10 dark:bg-black/20 text-[#D9541E] font-semibold border border-[#D9541E]/30 truncate max-w-[130px] sm:max-w-[180px]">
                 {targetRole}
               </span>
             ) : (
@@ -245,27 +251,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveServiceTab('jd')}
-            className={`flex-1 sm:flex-initial flex items-center gap-2.5 px-5 py-3 rounded-xl font-display text-sm font-bold transition-all duration-200 ease-in-out ${
+            className={`w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-display text-xs sm:text-sm font-bold transition-all duration-200 ease-in-out ${
               activeServiceTab === 'jd'
                 ? 'bg-[#111111] text-[#F3EEE3] dark:bg-[#F3EEE3] dark:text-[#111111] shadow-elevated'
                 : 'text-neutral-600 dark:text-neutral-400 hover:text-[#111111] dark:hover:text-[#F3EEE3] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
           >
-            <FileText className="w-4 h-4 text-[#D9541E]" />
-            <span>Target Job Posting</span>
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#D9541E] shrink-0" />
+              <span>Target Job Posting</span>
+            </div>
             {hasJdResults ? (
               <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
                 Active
               </span>
             ) : (
-              <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                {jdFile ? (jdFile.name.length > 15 ? jdFile.name.slice(0, 15) + '...' : jdFile.name) : 'Upload JD'}
+              <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 truncate max-w-[130px]">
+                {jdFile ? (jdFile.name.length > 12 ? jdFile.name.slice(0, 12) + '...' : jdFile.name) : 'Upload JD'}
               </span>
             )}
           </button>
         </div>
 
-        <div className="hidden lg:flex items-center gap-2 px-4 text-xs font-mono text-neutral-500">
+        <div className="hidden lg:flex items-center gap-2 px-3 text-xs font-mono text-neutral-500">
           <span>Active Service Mode:</span>
           <strong className="text-[#D9541E]">
             {activeServiceTab === 'discipline'
@@ -280,11 +288,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ----------------------------------------------------------- */}
       {/* RECONFIGURABLE ASSESSMENT CONFIGURATION WORKSPACE           */}
       {/* ----------------------------------------------------------- */}
-      <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp transition-colors duration-300 ease-in-out">
+      <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-4 sm:p-6 shadow-crisp transition-colors duration-300 ease-in-out">
         {/* Card Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-black/10 dark:border-white/10 transition-colors duration-300 ease-in-out">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-black/10 dark:border-white/10 transition-colors duration-300 ease-in-out">
           <div>
-            <h2 className="font-display text-xl font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3] transition-colors duration-300 ease-in-out">
+            <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3] transition-colors duration-300 ease-in-out">
               {activeServiceTab === 'discipline'
                 ? 'Target Discipline Assessment Configuration'
                 : 'Target Job Posting Assessment Configuration'}
@@ -296,7 +304,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0 pt-1 sm:pt-0">
             <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors duration-300 ease-in-out">
               <input
                 type="checkbox"
@@ -321,7 +329,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 items-stretch"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8 pt-6 items-stretch"
             >
               {/* Left Column: Candidate Resume PDF Uploader */}
               <div className="flex flex-col h-full">
@@ -389,17 +397,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 mb-2 transition-colors duration-300 ease-in-out">
                     Or Live Search Any Target Discipline
                   </label>
-                  <form onSubmit={handleCustomRoleSubmit} className="flex gap-2">
+                  <form onSubmit={handleCustomRoleSubmit} className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       placeholder="e.g. Agentic AI Engineer, Quantitative Researcher..."
                       value={customRoleInput}
                       onChange={(e) => setCustomRoleInput(e.target.value)}
-                      className="flex-1 px-3.5 py-2 rounded-lg border border-black/15 bg-white dark:bg-black/40 text-xs focus:outline-none focus:ring-2 focus:ring-[#D9541E] transition-colors duration-200 ease-in-out"
+                      className="min-w-0 flex-1 px-3.5 py-2 rounded-lg border border-black/15 bg-white dark:bg-black/40 text-xs focus:outline-none focus:ring-2 focus:ring-[#D9541E] transition-colors duration-200 ease-in-out"
                     />
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-[#111111] text-[#F3EEE3] dark:bg-[#F3EEE3] dark:text-[#111111] text-xs font-bold rounded-lg hover:opacity-90 transition-opacity duration-200 ease-in-out shrink-0 shadow-crisp"
+                      className="w-full sm:w-auto px-4 py-2 bg-[#111111] text-[#F3EEE3] dark:bg-[#F3EEE3] dark:text-[#111111] text-xs font-bold rounded-lg hover:opacity-90 transition-opacity duration-200 ease-in-out shrink-0 shadow-crisp"
                     >
                       Set Role
                     </button>
@@ -426,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 items-stretch"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8 pt-6 items-stretch"
             >
               {/* Left Column: Candidate Resume PDF Uploader */}
               <div className="flex flex-col h-full">
@@ -573,34 +581,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ) : (
             <>
               {/* Row 1: 3 Hero KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card 1: Role Readiness */}
-            <div className="rounded-xl border border-[#111111] bg-[#111111] text-[#F3EEE3] p-6 shadow-elevated flex flex-col justify-between transition-colors duration-300 ease-in-out">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-                    Role Readiness Score
-                  </span>
-                  <div className="font-display text-4xl font-bold mt-2 text-[#F3EEE3]">
-                    {readiness.toFixed(1)}%
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {/* Card 1: Role Readiness */}
+                <div className="rounded-xl border border-[#111111] bg-[#111111] text-[#F3EEE3] p-5 sm:p-6 shadow-elevated flex flex-col justify-between transition-colors duration-300 ease-in-out">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 block truncate">
+                        Role Readiness Score
+                      </span>
+                      <div className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-1.5 text-[#F3EEE3] truncate">
+                        {readiness.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      <ScoreGauge
+                        score={readiness}
+                        size={64}
+                        strokeWidth={6}
+                        color="#D9541E"
+                        showScoreText={false}
+                        icon={<Award className="w-7 h-7 text-[#D9541E]" />}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10 text-xs text-neutral-400 leading-snug">
+                    <span className="font-semibold text-emerald-400">
+                      {delta !== null && delta !== undefined ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% vs prior` : 'Initial Baseline'}
+                    </span>
+                    . Measures verified candidate skills against {targetRole} industry standards.
                   </div>
                 </div>
-                <ScoreGauge
-                  score={readiness}
-                  size={64}
-                  strokeWidth={6}
-                  color="#D9541E"
-                  showScoreText={false}
-                  icon={<Award className="w-7 h-7 text-[#D9541E]" />}
-                />
-              </div>
-              <div className="pt-4 border-t border-white/10 text-xs text-neutral-400 leading-snug">
-                <span className="font-semibold text-emerald-400">
-                  {delta !== null && delta !== undefined ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% vs prior` : 'Initial Baseline'}
-                </span>
-                . Measures verified candidate skills against {targetRole} industry standards.
-              </div>
-            </div>
 
             {/* Card 2: Project Rigor & Evidence Progress Bars */}
             <div className="rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp flex flex-col justify-between transition-colors duration-300 ease-in-out">
@@ -804,26 +814,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             /* Complete Identical 3-Row Architecture for Target Job Posting */
             <>
               {/* Row 1: 3 Hero KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                 {/* Card 1: Target JD Fit Score */}
-                <div className="rounded-xl border border-[#111111] bg-[#111111] text-[#F3EEE3] p-6 shadow-elevated flex flex-col justify-between transition-colors duration-300 ease-in-out">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                <div className="rounded-xl border border-[#111111] bg-[#111111] text-[#F3EEE3] p-5 sm:p-6 shadow-elevated flex flex-col justify-between transition-colors duration-300 ease-in-out">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 block truncate">
                         Target Job Posting Fit
                       </span>
-                      <div className="font-display text-4xl font-bold mt-2 text-[#F3EEE3]">
+                      <div className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-1.5 text-[#F3EEE3] truncate">
                         {jdFit.toFixed(1)}%
                       </div>
                     </div>
-                    <ScoreGauge
-                      score={jdFit}
-                      size={64}
-                      strokeWidth={6}
-                      color="#D9541E"
-                      showScoreText={false}
-                      icon={<Target className="w-7 h-7 text-[#D9541E]" />}
-                    />
+                    <div className="shrink-0">
+                      <ScoreGauge
+                        score={jdFit}
+                        size={64}
+                        strokeWidth={6}
+                        color="#D9541E"
+                        showScoreText={false}
+                        icon={<Target className="w-7 h-7 text-[#D9541E]" />}
+                      />
+                    </div>
                   </div>
                   <div className="pt-4 border-t border-white/10 text-xs text-neutral-400 leading-snug">
                     <span className="font-semibold text-emerald-400">Direct Dual-Scoring</span>

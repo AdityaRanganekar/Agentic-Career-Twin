@@ -96,15 +96,15 @@ export const AuthPortal: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-[#F3EEE3] text-[#111111]">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#F3EEE3] text-[#111111]">
       {/* Left Panel: Architectural Identity & System Status */}
-      <div className="w-full md:w-1/2 bg-[#111111] text-[#F3EEE3] p-8 md:p-16 flex flex-col justify-between border-b md:border-b-0 md:border-r border-[#111111] relative overflow-hidden">
+      <div className="w-full lg:w-1/2 bg-[#111111] text-[#F3EEE3] p-6 sm:p-10 lg:p-16 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-[#111111] relative overflow-hidden">
         {/* Subtle geometric background line */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#D9541E]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-[#D9541E] flex items-center justify-center font-display font-bold text-xl text-white">
+            <div className="w-9 h-9 rounded-lg bg-[#D9541E] flex items-center justify-center font-display font-bold text-xl text-white shadow-crisp">
               CT
             </div>
             <div>
@@ -117,17 +117,17 @@ export const AuthPortal: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-12 md:mt-20 max-w-md">
-            <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-[#F3EEE3] leading-tight">
+          <div className="mt-8 sm:mt-12 lg:mt-20 max-w-md">
+            <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#F3EEE3] leading-tight">
               Evidence-Grounded Competency & Role Readiness
             </h2>
-            <p className="mt-4 text-sm text-neutral-400 leading-relaxed font-sans">
+            <p className="mt-3 sm:mt-4 text-xs sm:text-sm text-neutral-400 leading-relaxed font-sans">
               Replaces keyword-matching ATS with dense semantic vector alignment, 3-pillar project proof evaluation, and dynamic multi-platform study roadmaps.
             </p>
           </div>
 
           {/* Architectural Feature Highlights */}
-          <div className="mt-10 space-y-4 max-w-md">
+          <div className="mt-6 sm:mt-10 space-y-3 sm:space-y-4 max-w-md">
             <div className="flex items-start gap-3.5 p-3 rounded-lg bg-white/5 border border-white/10">
               <Cpu className="w-5 h-5 text-[#D9541E] shrink-0 mt-0.5" />
               <div>
@@ -167,14 +167,14 @@ export const AuthPortal: React.FC = () => {
         </div>
 
         {/* System Status Pill */}
-        <div className="mt-12 flex items-center gap-2 text-xs font-mono text-neutral-400">
+        <div className="mt-8 sm:mt-12 flex items-center gap-2 text-xs font-mono text-neutral-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span>PostgreSQL & Vector Engine Online</span>
         </div>
       </div>
 
       {/* Right Panel: Clean Editorial Authentication Form */}
-      <div className="w-full md:w-1/2 p-8 md:p-16 flex items-center justify-center bg-[#F3EEE3]">
+      <div className="w-full lg:w-1/2 p-5 sm:p-10 lg:p-16 flex items-center justify-center bg-[#F3EEE3]">
         <div className="w-full max-w-md">
           {/* Tab Switcher */}
           <div className="flex items-center border-b border-black/15 mb-8">

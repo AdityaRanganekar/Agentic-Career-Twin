@@ -96,7 +96,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
           </div>
 
           {jdCount > 0 && (
-            <div className="flex items-center gap-1.5 p-1 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 self-start sm:self-auto">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 self-start sm:self-auto">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
@@ -191,7 +191,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
               <h4 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">
                 Direct Multi-Platform Study Launchers:
               </h4>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2.5">
                 {rec.platform_links && rec.platform_links.length > 0 ? (
                   rec.platform_links.map((link) => (
                     <a
@@ -199,12 +199,12 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-transform hover:-translate-y-0.5 shadow-crisp ${getPlatformClass(
+                      className={`inline-flex items-center justify-center sm:justify-start gap-1.5 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-transform hover:-translate-y-0.5 shadow-crisp min-h-[42px] ${getPlatformClass(
                         link.platform
                       )}`}
                     >
                       <span>{link.platform}</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                     </a>
                   ))
                 ) : (
@@ -212,10 +212,10 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
                     href={rec.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-[#D9541E] text-white"
+                    className="inline-flex items-center justify-center sm:justify-start gap-1.5 px-3.5 py-2.5 rounded-lg text-xs font-bold bg-[#D9541E] text-white min-h-[42px]"
                   >
                     <span>Primary Course Search</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                   </a>
                 )}
               </div>

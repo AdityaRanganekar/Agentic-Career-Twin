@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import asyncio
 import requests
 import urllib.parse
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -83,7 +84,7 @@ def get_google_auth_url(redirect_uri: Optional[str] = None):
     """Returns Google OAuth authorization URL if credentials are configured in environment."""
     client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    effective_redirect_uri = redirect_uri or os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173")
+    effective_redirect_uri = redirect_uri or os.getenv("GOOGLE_REDIRECT_URI", os.getenv("FRONTEND_URL", "http://localhost:5173"))
     if client_id and client_secret:
         auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -107,7 +108,7 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)):
     is_pytest = bool(os.getenv("PYTEST_CURRENT_TEST"))
     client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    effective_redirect_uri = req.redirect_uri or os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173")
+    effective_redirect_uri = req.redirect_uri or os.getenv("GOOGLE_REDIRECT_URI", os.getenv("FRONTEND_URL", "http://localhost:5173"))
 
     email: Optional[str] = None
     name: Optional[str] = None
@@ -160,7 +161,26 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)):
                 google_id = info.get("sub")
             except HTTPException:
                 raise
+            except requests.exceptions.RequestException as e:
+                err_str = str(e).lower()
+                if any(x in err_str for x in ["nameresolutionerror", "name or service not known", "failed to resolve", "getaddrinfo failed"]):
+                    logger.error(f"Google OAuth DNS resolution error: {e}")
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Network DNS Error: Your machine could not resolve oauth2.googleapis.com. Please check your internet/Wi-Fi connection or DNS settings, or sign in using your Username/Email and Password."
+                    )
+                logger.error(f"Google OAuth connection error: {e}")
+                raise HTTPException(
+                    status_code=503,
+                    detail="Network DNS Error: Your machine could not resolve oauth2.googleapis.com. Please check your internet/Wi-Fi connection or DNS settings, or sign in using your Username/Email and Password."
+                )
             except Exception as e:
+                err_str = str(e).lower()
+                if any(x in err_str for x in ["nameresolutionerror", "name or service not known", "failed to resolve"]):
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Network DNS Error: Your machine could not resolve oauth2.googleapis.com. Please check your internet/Wi-Fi connection or DNS settings, or sign in using your Username/Email and Password."
+                    )
                 logger.error(f"Google OAuth exchange error: {e}")
                 raise HTTPException(status_code=401, detail=f"Google authentication failed: {str(e)}")
     elif is_pytest and req.email:
@@ -246,15 +266,21 @@ async def process_resume(
     if clean_role and clean_role.lower() in {"none", "null", "undefined", "target job posting", "custom job posting"}:
         clean_role = None
 
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
     # 2. Extract JD text if uploaded
     extracted_jd_text = None
     if jd_file is not None and jd_file.filename:
         try:
             jd_bytes = await jd_file.read()
+            if len(jd_bytes) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="Job description file exceeds maximum allowed size of 10 MB.")
             extracted = extract_text_from_upload(jd_bytes, jd_file.filename)
             if extracted and extracted.strip():
                 extracted_jd_text = extracted.strip()
                 logger.info(f"Successfully extracted {len(extracted_jd_text)} chars from uploaded JD file: {jd_file.filename}")
+        except HTTPException:
+            raise
         except Exception as jd_err:
             logger.warning(f"Failed extracting text from uploaded JD file ({jd_file.filename}): {str(jd_err)}")
 
@@ -298,6 +324,8 @@ async def process_resume(
         if file is None:
             raise HTTPException(status_code=400, detail="Either a resume PDF file or cached_profile_json must be provided.")
         pdf_bytes = await file.read()
+        if len(pdf_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Resume file exceeds maximum allowed size of 10 MB.")
 
     initial_state = {
         "pdf_bytes": pdf_bytes,
@@ -311,7 +339,7 @@ async def process_resume(
     
     try:
         graph = compile_career_twin_graph(db)
-        final_state = graph.invoke(initial_state)
+        final_state = await asyncio.to_thread(graph.invoke, initial_state)
         
         if final_state.get("errors"):
             logger.warning(f"Graph completed with recoverable errors: {final_state['errors']}")

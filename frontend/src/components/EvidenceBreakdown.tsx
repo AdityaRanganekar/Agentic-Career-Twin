@@ -28,32 +28,32 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
   const proof = breakdown.detected_proof_links || [];
 
   return (
-    <div className="w-full rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-6 shadow-crisp">
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-black/10 dark:border-white/10 gap-3">
+    <div className="w-full rounded-xl border border-black/15 dark:border-white/15 bg-canvas-card dark:bg-black/30 p-4 sm:p-6 shadow-crisp">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 sm:pb-5 border-b border-black/10 dark:border-white/10 gap-3">
         <div>
-          <h3 className="font-display text-lg font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3]">
+          <h3 className="font-display text-base sm:text-lg font-bold tracking-tight text-[#111111] dark:text-[#F3EEE3]">
             {title}
           </h3>
           <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
             {subtitle}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
             Overall Rigor:
           </span>
-          <span className="font-mono text-sm font-bold px-2.5 py-1 rounded-md bg-[#D9541E] text-white">
+          <span className="font-mono text-xs sm:text-sm font-bold px-2.5 py-1 rounded-md bg-[#D9541E] text-white shadow-crisp">
             {projectQualityScore?.toFixed(1) || '0.0'}%
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 pt-5 sm:pt-6">
         {/* Column 1: Quantitative Metrics */}
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#D9541E]" />
+              <BarChart3 className="w-4 h-4 text-[#D9541E] shrink-0" />
               <h4 className="font-display text-sm font-bold text-[#111111] dark:text-[#F3EEE3]">
                 Quantitative Impact
               </h4>
@@ -70,7 +70,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
               metrics.map((m, idx) => (
                 <span
                   key={idx}
-                  className="font-mono text-xs px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-neutral-200"
+                  className="font-mono text-xs px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-neutral-200 break-words"
                 >
                   {m}
                 </span>
@@ -87,7 +87,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-[#D9541E]" />
+              <Cpu className="w-4 h-4 text-[#D9541E] shrink-0" />
               <h4 className="font-display text-sm font-bold text-[#111111] dark:text-[#F3EEE3]">
                 {stackLabel}
               </h4>
@@ -104,7 +104,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
               stack.map((s, idx) => (
                 <span
                   key={idx}
-                  className="font-mono text-xs px-2 py-0.5 rounded bg-[#D9541E]/10 border border-[#D9541E]/20 text-[#D9541E] dark:text-[#F3EEE3] font-medium"
+                  className="font-mono text-xs px-2 py-0.5 rounded bg-[#D9541E]/10 border border-[#D9541E]/20 text-[#D9541E] dark:text-[#F3EEE3] font-medium break-words"
                 >
                   {s}
                 </span>
@@ -121,7 +121,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-[#D9541E]" />
+              <Link2 className="w-4 h-4 text-[#D9541E] shrink-0" />
               <h4 className="font-display text-sm font-bold text-[#111111] dark:text-[#F3EEE3]">
                 Verifiable Proof & Links
               </h4>
@@ -138,7 +138,7 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
               proof.map((p, idx) => (
                 <span
                   key={idx}
-                  className="font-mono text-xs px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-neutral-200"
+                  className="font-mono text-xs px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-neutral-200 break-all break-words max-w-full"
                 >
                   {p}
                 </span>
@@ -154,4 +154,3 @@ export const EvidenceBreakdown: React.FC<EvidenceBreakdownProps> = ({
     </div>
   );
 };
-

@@ -1,17 +1,54 @@
 import os
 import numpy as np
-
-# Ensure HuggingFace uses cached local files without network delay
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-
 from functools import lru_cache
-from typing import List, Dict
+from typing import List, Dict, Union
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
 from src.utils.logger import get_custom_logger
 
+try:
+    from fastembed import TextEmbedding
+    HAS_FASTEMBED = True
+except ImportError:
+    HAS_FASTEMBED = False
+
 logger = get_custom_logger(__name__)
+
+class FastEmbedModelAdapter:
+    """
+    Adapter around fastembed.TextEmbedding providing 100% API compatibility with SentenceTransformer.
+    Specifically implements .encode(texts, convert_to_numpy=True, normalize_embeddings=True)
+    returning normalized numpy arrays of shape (len(texts), 384) or (384,) for single strings.
+    """
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self._model = TextEmbedding(model_name=model_name)
+
+    def encode(
+        self,
+        sentences: Union[str, List[str]],
+        batch_size: int = 32,
+        show_progress_bar: bool = False,
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        device: str = None,
+        normalize_embeddings: bool = True,
+        **kwargs
+    ) -> np.ndarray:
+        is_single = isinstance(sentences, str)
+        text_list = [sentences] if is_single else list(sentences)
+
+        if not text_list:
+            return np.empty((0, 384), dtype=np.float32)
+
+        embeddings_gen = self._model.embed(text_list, batch_size=batch_size)
+        embeddings = np.array(list(embeddings_gen), dtype=np.float32)
+
+        if normalize_embeddings:
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            embeddings = embeddings / norms
+
+        return embeddings[0] if is_single else embeddings
 
 # Acronym expansions for domain-specific terminology that compact embedding models struggle with
 ACRONYM_EXPANSIONS: Dict[str, str] = {
@@ -79,22 +116,39 @@ DOMAIN_EXPANSIONS: Dict[str, str] = {
 }
 
 @lru_cache(maxsize=1)
-def get_embedding_model() -> SentenceTransformer:
+def get_embedding_model():
     """
-    Singleton loader for the 384-dimensional SentenceTransformer model.
-    Cached in RAM to prevent disk I/O latency on repeated API requests.
-    Uses local cached weights to avoid network timeout delays.
+    Singleton loader for the 384-dimensional embedding model.
+    Prioritizes ONNX FastEmbed (TextEmbedding) for lean, high-performance CPU inference (<160 MB RAM).
+    Cached in RAM to prevent redundant re-initialization and latency on repeated requests.
+    Gracefully falls back to SentenceTransformer if fastembed is not installed.
     """
-    model_name = "all-MiniLM-L6-v2"
-    logger.info(f"Loading SentenceTransformer singleton model: {model_name}")
+    if HAS_FASTEMBED:
+        logger.info("Loading FastEmbed ONNX singleton model: sentence-transformers/all-MiniLM-L6-v2")
+        return FastEmbedModelAdapter(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     try:
-        return SentenceTransformer(model_name, local_files_only=True)
-    except Exception:
-        return SentenceTransformer(model_name)
+        from sentence_transformers import SentenceTransformer
+        model_name = "all-MiniLM-L6-v2"
+        logger.info(f"Loading SentenceTransformer singleton model: {model_name}")
+        try:
+            return SentenceTransformer(model_name, local_files_only=True)
+        except Exception:
+            return SentenceTransformer(model_name)
+    except ImportError:
+        raise ImportError("Neither 'fastembed' nor 'sentence-transformers' is installed.")
+
+@lru_cache(maxsize=2048)
+def _encode_text_cached(expanded_text: str) -> tuple:
+    """Encodes a single expanded text string into a normalized embedding tuple (hashable for lru_cache)."""
+    model = get_embedding_model()
+    vec = model.encode(expanded_text, convert_to_numpy=True, normalize_embeddings=True)
+    return tuple(vec)
 
 class EmbeddingEngine:
     """
     Computes dense semantic similarity matrices between candidate skills and market requirements.
+    Uses in-memory LRU vector caching to avoid repeated neural network forward passes.
     """
     def __init__(self):
         self.model = get_embedding_model()
@@ -115,6 +169,16 @@ class EmbeddingEngine:
             
         return raw_skill.strip()
 
+    @lru_cache(maxsize=2048)
+    def _encode_single(self, text: str) -> np.ndarray:
+        """
+        LRU-cached single string encoding.
+        Converts hashable tuple from internal cache to numpy ndarray in O(1).
+        """
+        expanded = self.expand_skill_text(text)
+        cached_tuple = _encode_text_cached(expanded)
+        return np.array(cached_tuple, dtype=np.float32)
+
     def compute_similarity_matrix(
         self,
         student_skills: List[str],
@@ -130,19 +194,8 @@ class EmbeddingEngine:
         if not student_skills or not market_skills:
             return np.zeros((len(student_skills), len(market_skills)))
 
-        expanded_student = [self.expand_skill_text(s) for s in student_skills]
-        expanded_market = [self.expand_skill_text(m) for m in market_skills]
-
-        student_vectors = self.model.encode(
-            expanded_student,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
-        market_vectors = self.model.encode(
-            expanded_market,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
+        student_vectors = np.vstack([self._encode_single(s) for s in student_skills])
+        market_vectors = np.vstack([self._encode_single(m) for m in market_skills])
 
         similarity_matrix = cosine_similarity(student_vectors, market_vectors)
         return similarity_matrix
@@ -153,5 +206,6 @@ class EmbeddingEngine:
         """
         if not text_a or not text_b:
             return 0.0
-        vecs = self.model.encode([text_a, text_b], convert_to_numpy=True, normalize_embeddings=True)
-        return float(np.dot(vecs[0], vecs[1]))
+        vec_a = self._encode_single(text_a)
+        vec_b = self._encode_single(text_b)
+        return float(np.dot(vec_a, vec_b))

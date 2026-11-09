@@ -1,14 +1,18 @@
-name: CI Pipeline
+name: Full-Stack CI & Hugging Face Spaces CD Pipeline
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  test:
-    name: Run Pytest Suite & Validity Benchmarks
+  # --------------------------------------------------------------------------
+  # JOB 1: Backend Testing & Human Validity Benchmarks
+  # --------------------------------------------------------------------------
+  backend-test:
+    name: Backend Pytest & Mathematical Validity Suite
     runs-on: ubuntu-latest
 
     steps:
@@ -24,18 +28,88 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev
+          sudo apt-get install -y --no-install-recommends libpq-dev
 
-      - name: Install Python Dependencies
+      - name: Install Python Dependencies (fastembed ONNX)
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
+
+      - name: Pre-Cache all-MiniLM-L6-v2 ONNX Embeddings
+        run: |
+          python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2')"
 
       - name: Execute Full Test Suite
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'mock_test_key' }}
-          DATABASE_URL: 'sqlite:///career_twin.db'
+          DATABASE_URL: 'sqlite:///./test_ci.db'
+          PYTHONPATH: '.'
         run: |
           pytest -v --tb=short
 
+  # --------------------------------------------------------------------------
+  # JOB 2: Frontend TypeScript & Vite Production Build Verification
+  # --------------------------------------------------------------------------
+  frontend-build:
+    name: Frontend TypeScript & Vite Production Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Production Bundle (tsc + vite)
+        run: npm run build
+
+  # --------------------------------------------------------------------------
+  # JOB 3: Continuous Deployment to Hugging Face Docker Spaces
+  # --------------------------------------------------------------------------
+  deploy-backend-hf:
+    name: Deploy Backend to Hugging Face Spaces
+    needs: [backend-test, frontend-build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Deploy to Hugging Face Docker Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
+        run: |
+          if [ -n "$HF_TOKEN" ] && [ -n "$HF_USERNAME" ] && [ -n "$HF_SPACE_NAME" ]; then
+            echo "All Hugging Face deployment credentials detected. Initiating deployment sync..."
+            git config --global user.email "ci-bot@agentic-career-twin.internal"
+            git config --global user.name "Career Twin CI/CD Bot"
+            git remote add hf-space "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}"
+            git push hf-space HEAD:main --force
+            echo "Successfully pushed latest repository commit to Hugging Face Space: ${HF_USERNAME}/${HF_SPACE_NAME}"
+          else
+            echo "=================================================================================="
+            echo "NOTICE: Hugging Face Spaces continuous deployment secrets not configured yet."
+            echo "To enable automated CD to your backend Space, add the following GitHub Secrets:"
+            echo "  1. HF_TOKEN       - Hugging Face write-access token (from hf.co/settings/tokens)"
+            echo "  2. HF_USERNAME    - Your Hugging Face username or organization"
+            echo "  3. HF_SPACE_NAME   - Your Hugging Face Space repository name"
+            echo "Skipping deployment step cleanly without failing the pipeline."
+            echo "=================================================================================="
+            exit 0
+          fi

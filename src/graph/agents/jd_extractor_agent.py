@@ -17,6 +17,74 @@ NOISE_WORDS = {
     "bachelor's degree", "master's degree", "phd", "degree", "years of experience"
 }
 
+def deterministic_extract_jd_weights(target_jd_text: str, db: Optional[Session] = None) -> Dict[str, float]:
+    """
+    Deterministic regex and taxonomy fallback that extracts weighted requirements directly
+    from target Job Description text in < 20ms when Gemini is offline, unreachable, or times out.
+    """
+    import re
+    from src.engine.skill_normalizer import TOOL_CANONICAL_CASING
+    from src.engine.competency_clusters import BASELINE_CANONICAL_TAXONOMY, consolidate_target_weights
+
+    jd_weights: Dict[str, float] = {}
+    jd_lower = target_jd_text.lower()
+
+    # 1. Match TOOL_CANONICAL_CASING
+    for alias, canonical in TOOL_CANONICAL_CASING.items():
+        if len(alias) >= 2 and canonical.lower() not in NOISE_WORDS:
+            pattern = r'(?<![a-zA-Z0-9_#+.-])' + re.escape(alias) + r'(?![a-zA-Z0-9_#+.-])'
+            if re.search(pattern, target_jd_text, re.IGNORECASE):
+                jd_weights[canonical] = 1.0
+
+    # 2. Match BASELINE_CANONICAL_TAXONOMY
+    for item in BASELINE_CANONICAL_TAXONOMY:
+        for alias in item.get("aliases", []):
+            if len(alias) >= 2 and alias.lower() not in NOISE_WORDS:
+                pattern = r'(?<![a-zA-Z0-9_#+.-])' + re.escape(alias) + r'(?![a-zA-Z0-9_#+.-])'
+                if re.search(pattern, target_jd_text, re.IGNORECASE):
+                    canonical = TOOL_CANONICAL_CASING.get(alias.lower(), alias.title())
+                    if canonical not in jd_weights and canonical.lower() not in NOISE_WORDS:
+                        jd_weights[canonical] = 1.0
+
+    # Consolidate sibling alternatives via database taxonomy
+    jd_weights = consolidate_target_weights(jd_weights, db=db)
+
+    # Multi-branch engineering degree consolidation
+    ENGINEERING_BRANCH_PATTERNS = [
+        "mechanical engineering", "electrical engineering", "electronics engineering",
+        "electronics & telecommunication engineering", "electronics and telecommunication engineering",
+        "electronics & tele comm.", "electronics & tele comm", "electronics and communication engineering",
+        "chemical engineering", "civil engineering", "computer engineering", "computer science engineering",
+        "ai & ml engineering", "ai ml engineering"
+    ]
+    matched_branch_keys = []
+    for k in list(jd_weights.keys()):
+        k_low = k.strip().lower()
+        if any(b in k_low for b in ENGINEERING_BRANCH_PATTERNS) or (
+            ("mechanical" in k_low or "electrical" in k_low or "electronics" in k_low or "chemical" in k_low)
+            and ("engineering" in k_low or "degree" in k_low or "graduate" in k_low)
+        ):
+            matched_branch_keys.append(k)
+
+    if len(matched_branch_keys) >= 2:
+        for mb in matched_branch_keys:
+            if mb in jd_weights:
+                del jd_weights[mb]
+        jd_weights["Engineering Degree Eligibility (CS / AI-ML / Core Engineering)"] = 1.0
+
+    # Functional department safeguard for TPO/Operations apprentice notices
+    if "operations" in jd_lower and ("process planning" in jd_lower or "production" in jd_lower or "logistics" in jd_lower):
+        if not any("process" in k.lower() or "operations" in k.lower() for k in jd_weights):
+            jd_weights["Operations & Process Planning"] = 1.0
+        if not any("quality" in k.lower() for k in jd_weights) and "quality" in jd_lower:
+            jd_weights["Quality Assurance & Control"] = 1.0
+        if not any("logistics" in k.lower() or "production" in k.lower() for k in jd_weights) and ("logistics" in jd_lower or "production" in jd_lower):
+            jd_weights["Production & Logistics Systems"] = 1.0
+        if not any("agile" in k.lower() for k in jd_weights) and "agile" in jd_lower:
+            jd_weights["Agile Methodologies"] = 0.8
+
+    return jd_weights
+
 def run_jd_extractor_agent(state: CareerTwinState, db: Optional[Session] = None) -> Dict[str, Any]:
     """
     Extracts core and nice-to-have technical and professional competencies from an uploaded target Job Description (JD).
@@ -107,6 +175,11 @@ def run_jd_extractor_agent(state: CareerTwinState, db: Optional[Session] = None)
         return {"jd_extracted_reqs": jd_weights}
 
     except Exception as e:
+        logger.warning(f"Gemini JD extraction unavailable ({e}). Engaging deterministic rule-based JD extractor fallback.")
+        fallback_weights = deterministic_extract_jd_weights(target_jd_text, db=db)
+        if fallback_weights:
+            logger.info(f"Deterministic JD fallback extracted {len(fallback_weights)} requirements.")
+            return {"jd_extracted_reqs": fallback_weights}
         logger.error(f"JD Extractor Agent failed: {str(e)}")
         return {
             "jd_extracted_reqs": None,
