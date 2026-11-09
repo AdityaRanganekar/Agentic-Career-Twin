@@ -1,4 +1,4 @@
-name: Full-Stack CI & Hugging Face Spaces CD Pipeline
+name: Full-Stack CI/CD Pipeline (Pytest, Vite Build & Production Deploy)
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   # --------------------------------------------------------------------------
-  # JOB 1: Backend Testing & Human Validity Benchmarks
+  # JOB 1: Backend Testing & Mathematical Validity Suite
   # --------------------------------------------------------------------------
   backend-test:
     name: Backend Pytest & Mathematical Validity Suite
@@ -75,10 +75,10 @@ jobs:
         run: npm run build
 
   # --------------------------------------------------------------------------
-  # JOB 3: Continuous Deployment to Hugging Face Docker Spaces
+  # JOB 3: Continuous Deployment (Render Deploy Hook & Optional Cloud Sync)
   # --------------------------------------------------------------------------
-  deploy-backend-hf:
-    name: Deploy Backend to Hugging Face Spaces
+  deploy-production:
+    name: Continuous Deployment (Render & Cloud Sync)
     needs: [backend-test, frontend-build]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
@@ -89,27 +89,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Deploy to Hugging Face Docker Space
+      - name: Trigger Render Deploy Hook (If Configured)
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "Triggering Render automated deployment webhook..."
+            curl -X POST -s -S -f "$RENDER_DEPLOY_HOOK_URL"
+            echo "Render deploy hook triggered successfully!"
+          else
+            echo "NOTICE: RENDER_DEPLOY_HOOK_URL secret not configured in GitHub Secrets."
+            echo "If your Render Web Service is set to Auto-Deploy (default), Render deploys automatically on push."
+          fi
+
+      - name: Deploy to Hugging Face Docker Space (If Configured)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
           HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
         run: |
           if [ -n "$HF_TOKEN" ] && [ -n "$HF_USERNAME" ] && [ -n "$HF_SPACE_NAME" ]; then
-            echo "All Hugging Face deployment credentials detected. Initiating deployment sync..."
+            echo "Hugging Face credentials detected. Syncing code to Space..."
             git config --global user.email "ci-bot@agentic-career-twin.internal"
             git config --global user.name "Career Twin CI/CD Bot"
             git remote add hf-space "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}"
             git push hf-space HEAD:main --force
-            echo "Successfully pushed latest repository commit to Hugging Face Space: ${HF_USERNAME}/${HF_SPACE_NAME}"
-          else
-            echo "=================================================================================="
-            echo "NOTICE: Hugging Face Spaces continuous deployment secrets not configured yet."
-            echo "To enable automated CD to your backend Space, add the following GitHub Secrets:"
-            echo "  1. HF_TOKEN       - Hugging Face write-access token (from hf.co/settings/tokens)"
-            echo "  2. HF_USERNAME    - Your Hugging Face username or organization"
-            echo "  3. HF_SPACE_NAME   - Your Hugging Face Space repository name"
-            echo "Skipping deployment step cleanly without failing the pipeline."
-            echo "=================================================================================="
-            exit 0
+            echo "Successfully pushed latest commit to Hugging Face Space."
           fi
