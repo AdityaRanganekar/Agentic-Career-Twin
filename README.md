@@ -6,104 +6,68 @@ Agentic Career Twin is a full-stack, evidence-grounded career readiness assessme
 
 The system solves a concrete problem: objectively quantifying how prepared a candidate is for a target role, identifying precise skill gaps, and generating actionable, multi-platform learning roadmaps -- all grounded in verifiable evidence rather than subjective self-assessment.
 
-The backend employs a six-agent directed acyclic graph (ProfileAgent, MarketAgent, JDExtractorAgent, GapAgent, RecommendationAgent, Validator) with a retry loop, a three-tier hybrid skill matching architecture (exact/token match, database taxonomy lookup, dense semantic vector similarity via all-MiniLM-L6-v2), TF-IDF cross-role market weighting, exponential recency decay scoring, and a project quality evaluation pipeline. The frontend provides a React/TypeScript dashboard with competency radar charts, score gauges, evidence breakdowns, historical assessment tracking, and a multi-platform learning hub.
+The backend runs a six-node conditional LangGraph workflow (five processing agents plus a validator) with a recommendation retry loop, a three-tier hybrid skill matching architecture (exact/token match, database taxonomy lookup, dense semantic vector similarity via all-MiniLM-L6-v2), TF-IDF cross-role market weighting, exponential recency decay scoring, and a project quality evaluation pipeline. The frontend provides a React/TypeScript dashboard with competency radar charts, score gauges, evidence breakdowns, historical assessment tracking, and a multi-platform learning hub.
 
 ---
 
 ## System Architecture
 
 ```mermaid
-graph TB
-    subgraph "Frontend — React / TypeScript / Vite"
-        UI["Single-Page Application"]
-        AuthCtx["AuthContext — Session Management"]
-        API_SVC["API Service Layer — Axios"]
-        Dashboard["DashboardView — Resume Upload and Score Display"]
-        Roadmap["RoadmapView — Multi-Platform Learning Hub"]
-        History["HistoryView — Assessment Trajectory"]
-        Radar["CompetencyRadar — Recharts"]
-        Gauge["ScoreGauge — Animated Readiness Dial"]
-        Evidence["EvidenceBreakdown — Project Quality Metrics"]
+flowchart TD
+    User[Candidate]
+
+    subgraph FE["React and TypeScript frontend"]
+        UI[Dashboard: resume upload, scores, radar, history, roadmap]
     end
 
-    subgraph "Backend — FastAPI / Python 3.12"
-        APIGateway["FastAPI Router — /api/v1"]
-        AuthEndpoints["Authentication — Bcrypt and Google OAuth 2.0"]
-        ResumeEndpoint["POST /process-resume — Multipart Upload"]
-        HistoryEndpoint["GET /history/{id} — Run Archive"]
-
-        subgraph "LangGraph Orchestration Engine"
-            ProfileAgent["ProfileAgent — Resume Parsing and Skill Extraction"]
-            MarketAgent["MarketAgent — TF-IDF Market Weight Discovery"]
-            JDExtractor["JDExtractorAgent — Job Description Requirement Extraction"]
-            GapAgent["GapAgent — Hybrid Skill Coverage Evaluation"]
-            RecAgent["RecommendationAgent — Multi-Platform Study Guide"]
-            Validator["Validator — Retry Loop with 3-Attempt Cap"]
-        end
-
-        subgraph "Engine Layer"
-            EmbeddingEngine["EmbeddingEngine — all-MiniLM-L6-v2 ONNX"]
-            TaxonomyEngine["TaxonomyConceptEngine — PostgreSQL Taxonomy"]
-            ReadinessScorer["ReadinessScorer — TF-IDF Weighted Decay Scoring"]
-            ProjectEval["ProjectEvaluator — 3-Pillar Evidence Quality"]
-            SkillNormalizer["SkillNormalizer — Canonical Casing"]
-            Deduplicator["Deduplicator — Semantic Deduplication"]
-        end
+    User --> UI
+    UI -->|REST API| API
+    subgraph Backend["FastAPI backend"]
+        API[Authentication and assessment endpoints]
+        API --> Graph[LangGraph workflow]
+        API --> Persistence[Assessment history and digital twin]
     end
 
-    subgraph "Data Layer"
-        PostgreSQL["PostgreSQL — Neon Serverless"]
-        SQLite["SQLite — Local Development Fallback"]
-        DVC["DVC — Dataset Version Control"]
+    subgraph Agents["Assessment agents"]
+        Graph --> Profile[Profile extraction]
+        Profile --> Market[Market requirements]
+        Profile --> JD[Job description extraction]
+        Market --> JD
+        Market --> Gap[Gap analysis and scoring]
+        JD --> Gap
+        Gap --> Recs[Learning recommendations]
+        Recs --> Validator[Validation and retry]
+        Validator -->|Retry| Recs
     end
 
-    subgraph "External Services"
-        Gemini["Google Gemini API — Structured Extraction"]
-        GoogleOAuth["Google OAuth 2.0 — Identity Verification"]
-        MOOC["MOOC Platforms — Udemy, Coursera, edX, YouTube"]
+    subgraph Engines["Analysis engines"]
+        Gap --> Matching[Taxonomy and semantic matching]
+        Gap --> Scoring[TF-IDF, recency, project quality]
     end
 
-    UI --> API_SVC
-    API_SVC --> APIGateway
-    APIGateway --> AuthEndpoints
-    APIGateway --> ResumeEndpoint
-    APIGateway --> HistoryEndpoint
+    subgraph Data["Persistence"]
+        DB[(PostgreSQL<br/>SQLite fallback)]
+    end
 
-    ResumeEndpoint --> ProfileAgent
-    ProfileAgent --> MarketAgent
-    ProfileAgent --> JDExtractor
-    MarketAgent --> JDExtractor
-    MarketAgent --> GapAgent
-    JDExtractor --> GapAgent
-    GapAgent --> RecAgent
-    RecAgent --> Validator
-    Validator -->|"Retry"| RecAgent
-    Validator -->|"Pass"| ResumeEndpoint
+    Persistence --> DB
+    Profile -.->|Profile and taxonomy data| DB
+    Market -.->|Role snapshots| DB
+    Matching -.->|Taxonomy aliases| DB
+    Validator -->|Validated results| API
 
-    ProfileAgent --> Gemini
-    JDExtractor --> Gemini
-    RecAgent --> Gemini
-    MarketAgent --> TaxonomyEngine
-    GapAgent --> EmbeddingEngine
-    GapAgent --> TaxonomyEngine
-    GapAgent --> ReadinessScorer
-    GapAgent --> ProjectEval
-
-    AuthEndpoints --> GoogleOAuth
-    RecAgent --> MOOC
-
-    TaxonomyEngine --> PostgreSQL
-    ReadinessScorer --> PostgreSQL
-    MarketAgent --> PostgreSQL
-    ProfileAgent --> PostgreSQL
-    PostgreSQL -.->|"Fallback"| SQLite
+    Profile -->|Structured extraction| Gemini[Gemini API]
+    JD -->|Requirement extraction| Gemini
+    Recs -->|Study guidance| Gemini
+    Market -->|Cache miss: role research| Jobs[Job-market sources]
+    Recs -->|Search links| Learning[Learning platforms and documentation]
+    API --> OAuth[Google OAuth]
 ```
 
 The architecture separates concerns into four layers:
 
 - **Frontend**: A statically deployed React SPA (Vercel) that communicates with the backend exclusively through REST API calls. Handles authentication state, result visualization, and navigation.
 - **Backend API**: A FastAPI application exposing authentication, resume analysis, and history endpoints. On each analysis request, it compiles and invokes the LangGraph state machine, then persists results to the database.
-- **LangGraph Orchestration**: A six-node directed acyclic graph with conditional routing. The ProfileAgent extracts structured data; the MarketAgent retrieves or computes TF-IDF market weights; the JDExtractorAgent parses custom job descriptions; the GapAgent performs hybrid skill matching and readiness scoring; the RecommendationAgent generates multi-platform study guides; and the Validator enforces a retry loop (capped at 3 attempts) to ensure recommendation completeness.
+- **LangGraph Orchestration**: A six-node conditional workflow: five processing agents extract a candidate profile, gather optional market and job-description requirements, score skill gaps, and create recommendations. A Validator checks recommendation completeness and can retry generation up to three times.
 - **Data Layer**: PostgreSQL (Neon Serverless in production) stores students, analysis runs, digital twin state, market snapshots, job postings, skill taxonomies, and learning resources. Automatic fallback to local SQLite ensures the system remains operational without a PostgreSQL connection.
 
 ---
@@ -173,73 +137,20 @@ The architecture separates concerns into four layers:
 ## Data Flow / Workflow
 
 ```mermaid
-sequenceDiagram
-    actor User
-    participant Frontend as React SPA
-    participant API as FastAPI Backend
-    participant Profile as ProfileAgent
-    participant Market as MarketAgent
-    participant JD as JDExtractorAgent
-    participant Gap as GapAgent
-    participant Rec as RecommendationAgent
-    participant Val as Validator
-    participant Gemini as Google Gemini API
-    participant DB as PostgreSQL
-    participant Embed as EmbeddingEngine
-
-    User->>Frontend: Upload Resume PDF + Select Target Role
-    Frontend->>API: POST /api/v1/process-resume (multipart/form-data)
-    API->>API: Extract text from PDF/DOCX/TXT
-    API->>Profile: Invoke LangGraph State Machine
-
-    Profile->>Gemini: Structured extraction (StudentTwinProfile schema)
-    Gemini-->>Profile: Name, education, experience, projects, skills with dates
-    Profile->>DB: Normalize skills against taxonomies table
-
-    alt Target Role Provided
-        Profile->>Market: Route to MarketAgent
-        Market->>DB: Check MarketSnapshot cache (TTL lookup)
-        alt Cache Hit
-            DB-->>Market: Return cached TF-IDF weights
-        else Cache Miss
-            Market->>Market: Live Web Role Discovery
-            Market->>DB: Persist new MarketSnapshot
-        end
-    end
-
-    alt Job Description Provided
-        Market->>JD: Route to JDExtractorAgent
-        JD->>Gemini: Extract core and nice-to-have skills (JDExtractionResult)
-        Gemini-->>JD: Weighted skill requirements
-        JD->>DB: Consolidate via taxonomy aliases
-    end
-
-    JD->>Gap: Forward extracted requirements
-    Market->>Gap: Forward TF-IDF market weights
-
-    Gap->>Embed: Compute semantic similarity matrix (all-MiniLM-L6-v2)
-    Gap->>DB: Query taxonomy aliases for concept matching
-    Gap->>Gap: Three-tier hybrid matching (exact, taxonomy, semantic)
-    Gap->>Gap: Apply recency decay + seniority modifier
-    Gap->>Gap: Evaluate 3-pillar project quality
-    Gap->>Gap: Compute readiness score + radar dimensions
-
-    Gap->>Rec: Pass missing skills list
-    Rec->>Gemini: Generate study justifications (MultiSkillStudyGuide)
-    Rec->>Rec: Build multi-platform search URLs (Udemy, Coursera, edX, YouTube, Docs)
-
-    Rec->>Val: Forward recommendations
-    Val->>Val: Validate completeness
-
-    alt Validation Failed and Retries < 3
-        Val->>Rec: Retry recommendation generation
-    end
-
-    Val-->>API: Return final state
-    API->>DB: Persist AnalysisRun + upsert StudentTwin
-    API->>DB: Compute score delta vs. previous run
-    API-->>Frontend: JSON response (scores, gaps, radar, recommendations)
-    Frontend->>User: Render dashboard with radar chart, score gauge, roadmap
+flowchart TD
+    Input[Resume or cached profile] --> Profile[ProfileAgent: extract and normalize skills]
+    Profile --> HasRole{Target role provided?}
+    HasRole -->|Yes| Market[MarketAgent: cached or researched role requirements]
+    HasRole -->|No| HasJD
+    Market --> HasJD{Job description provided?}
+    HasJD -->|Yes| JD[JDExtractorAgent: extract weighted requirements]
+    HasJD -->|No| Gap
+    JD --> Gap[GapAgent: taxonomy and semantic matching<br/>readiness, fit, radar, evidence scores]
+    Gap --> Recs[RecommendationAgent: study guidance and platform links]
+    Recs --> Validate{Recommendations complete?}
+    Validate -->|No, up to 3 retries| Recs
+    Validate -->|Yes or retry limit reached| Persist[Persist assessment and update digital twin]
+    Persist --> Result[Return scores, gaps, radar, and recommendations]
 ```
 
 ---
