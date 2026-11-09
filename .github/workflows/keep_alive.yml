@@ -1,0 +1,28 @@
+name: Render Free Tier Keep-Alive Ping
+
+on:
+  schedule:
+    # Run every 10 minutes to prevent Render free-tier spin down (15-minute inactivity limit)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    name: Ping Render Health Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Keep-Alive Ping
+        env:
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL || 'https://career-twin-api.onrender.com' }}
+        run: |
+          URL="${RENDER_API_URL%/}/health"
+          echo "Pinging health endpoint: $URL"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 35 "$URL" || true)
+          echo "HTTP Response Status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Success: Render backend is warm and active."
+          else
+            echo "Notice: Endpoint returned HTTP $HTTP_CODE or timed out. Triggered wake-up request."
+          fi
+
